@@ -1,24 +1,25 @@
-﻿<#
+﻿#requires -Modules NetTCPIP, ServerManager
+<#
         .SYNOPSIS
         Installs the Subordinate Certificate Authority role and configures it.
     
         .DESCRIPTION
-        Script developed for to install a Subordinate Certificate Authority when a Root (Offline) Certificate Authority is already installed.
+        Script developed for to install a Subordinate Certificate Authority when a Root (Offline) Certificate Authority is already installed and configured.
         The configuration uses certutil.exe to modify the CA settings.
-        Tested on Windows Server 2012R2.
+        Tested on Windows Server 2012R2 and Server 2016.
 
         .EXAMPLE
-        ADCS_SubordinateCA.ps1 -Customer DEMO -DomainURL pki.demo.com
+        Install-ADCSSubordinateCA.ps1 -Customer Demo -DomainURL pki.demo.com
 
-        This will install the install and configure the Certificate Authority Service with the CA name "Contoso-Subordinate-CA".
+        This will install the install and configure the Certificate Authority Service with the CA name "Demo-Subordinate-CA".
         It will create the PKI folder in the default location ("$env:SystemDrive\PKI").
         The PKI folder contains the Database and paths for AIA and CRL.
         A Web Virtual Directory will be created with the name PKI mapped to "$env:SystemDrive\PKI\Web"
+        Three scheduled tasks will be created 
 
-        This will install the install and configure the Certificate Authority Service with the CA name "Demo-Subordinate-CA".
 
         .EXAMPLE
-        ADCS_SubordinateCA.ps1 -Customer Contoso -DomainURL pki.demo.com -LocalPKIPath E:\CALocation
+        Install-ADCSSubordinateCA.ps1 -Customer Contoso -DomainURL pki.contoso.com -LocalPKIPath E:\CALocation
 
         This will install the install and configure the Certificate Authority Service with the CA name "Contoso-Subordinate-CA".
         It will create a folder named CALocation in E:\.
@@ -29,13 +30,14 @@
         Created on:     2016-05-11 09:15
         Created by:     Philip Haglund
         Organization:   Gonjer.com for Zetup AB
-        Filename:       ADCS_SubordinateCA.ps1
-        Version:        1.4
+        Filename:       Install-ADCSSubordinateCA.ps1
+        Version:        0.5
         Requirements:   Powershell 4.0 (Module: NetTCPIP, ServerManager)
         Changelog:      2016-05-11 09:15 - Creation of script
                         2016-09-19 16:25 - Removed LDAP paths CRL: "\n79:ldap:///CN=%7%8,CN=%2,CN=CDP,CN=Public Key Services,CN=Services,%6%10" AIA: \n3:ldap:///CN=%7,CN=AIA,CN=Public Key Services,CN=Services,%6%11
                         2016-09-20 09:10 - Removed SMB Share requirements.
                         2016-10-07 15:21 - Completly changed the prompt text for the manual steps. Minor bugfixes and corrections based on PSSharper.
+                        2017-01-10 14:03 - Set web.config to hidden. Added Group Policy recommendation for auto enrollment. Added 
         .LINK
         https://www.gonjer.com
         http://www.zetup.se
@@ -83,8 +85,7 @@ begin
         
         $do = $true
         do
-        {
-            
+        {            
             $choice = $Host.ui.PromptForChoice($caption,$message, $options,$defaultChoice)
             switch ($choice)
             {
@@ -141,12 +142,12 @@ process
             Write-Warning -Message 'Unable to install Windows Feature ADCS-Cert-Authority'
             Write-Warning -Message "$($_.Exception.Message)"
             Write-Output -InputObject 'Exiting script'
-            break
+            return
         }
         #endregion Install Windowsfeature ADCS-Cert-Authority, Adcs-Web-Enrollment
         
         #region Create directories
-        $certdb = New-Item -Path "$($LocalPKIPath)\Database\CertDB" -ItemType Directory -Force
+        $certdb  = New-Item -Path "$($LocalPKIPath)\Database\CertDB" -ItemType Directory -Force
         $certlog = New-Item -Path "$($LocalPKIPath)\Database\CertLog" -ItemType Directory -Force
         $webpath = New-Item -Path "$($LocalPKIPath)\Web" -ItemType Directory -Force
         $crlpath = New-Item -Path "$($LocalPKIPath)\Web\CRL" -ItemType Directory -Force
@@ -166,7 +167,7 @@ Policies=InternalUseOnly
 [Certsrv_Server]
 RenewalKeyLength=2048
 RenewalValidityPeriod=Years
-RenewalValidityPeriodUnits=10
+RenewalValidityPeriodUnits=5
 CRLPeriod=Days
 CRLPeriodUnits=7
 CRLDeltaPeriod=Days
@@ -226,8 +227,8 @@ Empty=True'
         # Declare Configuration and Domain NCs
         $null = & "$env:windir\system32\certutil.exe" -setreg ca\DSConfigDN $confignc
 
-        # Set Validity Period for Issued Certificates 5 years
-        $null = & "$env:windir\system32\certutil.exe" -setreg ca\ValidityPeriodUnits 5
+        # Set Validity Period for Issued Certificates 2 years
+        $null = & "$env:windir\system32\certutil.exe" -setreg ca\ValidityPeriodUnits 2
         $null = & "$env:windir\system32\certutil.exe" -setreg ca\ValidityPeriod 'Years'
 
         # Define CRL Publication Intervals.
@@ -273,6 +274,10 @@ $webconfig = @'
 </configuration>
 '@
         $webconfig | Out-File -FilePath "$($webpath.Fullname)\web.config" -Force -Encoding utf8
+
+        # Set web.config as hidden.
+        $webconfig = Get-Item "$($webpath.Fullname)\web.config" -Force
+        $webconfig.Attributes = 'Hidden'
         #endregion Create a web.config file to allow "allowDoubleEscaping"
 
         #region Create a new website in IIS for $($webpath.Fullname) with the name PKI
@@ -287,6 +292,19 @@ $webconfig = @'
             Write-Output -InputObject "Create a manual WebSite in IIS named PKI with target '$($webpath.Fullname)' and HostHeader '$($DomainURL)'"
             Confirm-ToContinue
         }
+
+        # Enable Directory Browse for the PKI site.
+        try
+        {
+            Set-WebConfigurationProperty -Filter '/system.webServer/directoryBrowse' -Name 'Enabled' -Value:$true -PSPath 'IIS:\Sites\PKI' -ErrorAction Stop
+        }
+        catch
+        {
+            Write-Warning -Message "Set-WebConfigurationProperty -Filter '/system.webServer/directoryBrowse' -Name 'Enabled' -Value:$true -PSPath 'IIS:\Sites\PKI'"
+            Write-Warning -Message "$($_.Exception.Message)"
+            Write-Output -InputObject 'Manually enable the directory browsing option i IIS for the PKI site'
+            Confirm-ToContinue
+        }
         #endregion Create a new website in IIS for $($webpath.Fullname) with the name PKI
 
         #region View all errors
@@ -298,8 +316,11 @@ $webconfig = @'
         {
             Write-Output -InputObject 'Errors were deteted while running the script, displaying errors:'
             Start-Sleep -Milliseconds 500
-            $Error.ForEach{"$($_.Exception.Message)`n"}
-            Write-Output -InputObject 'Done?'
+            foreach ($e in $Error)
+            {
+                "$($e.Exception.Message)"
+            }
+            Write-Output -InputObject 'Does everything look OK?'
             Confirm-ToContinue
         }
         #endregion View all errors
@@ -366,13 +387,24 @@ $webconfig = @'
 
         Write-Output -InputObject "`nStep 8: Install the Subordinate Certificate:"
         Write-Output -InputObject "Opening 'CertSrv.msc' (Right click the Subordinate CA and choose 'Install' and select the '$($LocalPKIPath)\$($Customer)-Subordinate-CA.P7B' file)."
-        Write-Output -InputObject "If prompted that the Root Certificate CA is not trusted, press cancel and redo the Install process."
+        Write-Output -InputObject 'If prompted that the Root Certificate CA is not trusted. The Root-CA Certificate is not yet replicated through the Active Directory.'
+        Write-Output -InputObject 'Press cancel and redo the Install Subordinate Certificate process after a minute or two.'
+        Start-Process -FilePath certsrv.msc
+        Confirm-ToContinue
+
+        Write-Output -InputObject "`nRecommended Step: Configure a top level Group Policy for Auto enrollment:"
+        Write-Output -InputObject "Open gpedit.msc and create a new Group Policy in the domain root. Example: $($Customer)-AutoEnrollment"
+        Write-Output -InputObject 'Configure both Computer Configuration (CC) and User Configuration (UC).'
+        Write-Output -InputObject 'CC or CU\Windows Settings\Security Settings\Public Key Policies\Certificate Services Client - Auto-Enrollment.'
+        Write-Output -InputObject 'Choose "Enabled" in the drop down list. Enable(tick) both options:'
+        Write-Output -InputObject 'Renew expired certificates, update pending certificate, and remove revoked certificates.'
+        Write-Output -InputObject 'Update certificates that user certificate templates.'
         Start-Process -FilePath certsrv.msc
         Confirm-ToContinue
         
         try
         {
-            Start-Service -Name 'certsvc' -Confirm:$false -WarningAction SilentlyContinue -ErrorAction Stop
+            $null = Start-Service -Name 'certsvc' -Confirm:$false -WarningAction SilentlyContinue -ErrorAction Stop
         }
         catch
         {
@@ -380,7 +412,9 @@ $webconfig = @'
             Write-Output -InputObject 'Please start the service manually.'
             Confirm-ToContinue
         }
+
         Start-Sleep -Seconds 3
+
         try
         {
             $null = Stop-Service -Name 'certsvc' -Force -ErrorAction Stop -WarningAction SilentlyContinue
@@ -391,9 +425,10 @@ $webconfig = @'
             Write-Output -InputObject 'Please stop the service manually.'
             Confirm-ToContinue
         }
+
         try
         {
-            Start-Service -Name 'certsvc' -Confirm:$false -WarningAction SilentlyContinue -ErrorAction Stop
+            $null = Start-Service -Name 'certsvc' -Confirm:$false -WarningAction SilentlyContinue -ErrorAction Stop
         }
         catch
         {
@@ -401,7 +436,6 @@ $webconfig = @'
             Write-Output -InputObject 'Please start the service manually.'
             Confirm-ToContinue
         }
-
         #endregion Prompt the Output for manual steps.
 
         #region Copy all AIA (Certificates) from the original store to the new AIA-Path

@@ -5,18 +5,18 @@
         .DESCRIPTION
         Script developed for to install a Root (Offline) Certificate Authority.
         The configuration uses certutil.exe to modify the CA settings.
-        Tested on Windows Server 2012R2.
+        Tested on Windows Server 2012R2 and Server 2016.
         Never use a network connection an a Root (Offline) Certificate Authority
 
         .EXAMPLE
-        ADCS_OfflineCA.ps1 -Customer DEMO -DomainURL pki.demo.com -ConfigNC 'CN=Configuration,DC=demo,DC=lab'
+        Install-ADCSOfflineCA.ps1 -Customer DEMO -DomainURL pki.demo.com -ConfigNC 'CN=Configuration,DC=demo,DC=lab'
 
         This will install the install and configure the Certificate Authority Service with the CA name "DEMO-Root-CA".
         It will create the PKI folder in the default location ("$env:SystemDrive\PKI").
         The PKI folder contains the Database and paths for AIA and CRL.
 
         .EXAMPLE
-        ADCS_OfflineCA.ps1 -Customer Contoso -DomainURL pki.contoso.com -ConfigNC 'CN=Configuration,DC=demo,DC=lab' -LocalPKIPath E:\CALocation
+        Install-ADCSOfflineCA.ps1 -Customer Contoso -DomainURL pki.contoso.com -ConfigNC 'CN=Configuration,DC=contoso,DC=com' -LocalPKIPath E:\CALocation
 
         This will install the install and configure the Certificate Authority Service with the CA name "Contoso-Root-CA".
         It will create a folder named PKI in CALocation on the disk E:\.
@@ -27,12 +27,13 @@
         Created on:     2016-05-11 09:15
         Created by:     Philip Haglund
         Organization:   Gonjer.com for Zetup AB
-        Filename:       ADCS_OfflineCA.ps1
-        Version:        1.3
+        Filename:       Install-ADCSOfflineCA.ps1
+        Version:        0.4
         Requirements:   Powershell 4.0 (Module: ServerManager)
         Changelog:      2016-05-11 09:15 - Creation of script
                         2016-09-19 16:20 - Removed LDAP paths CRL:"\n10:ldap:///CN=%7%8,CN=%2,CN=CDP,CN=Public Key Services,CN=Services,%6%10" AIA:"\n2:ldap:///CN=%7,CN=AIA,CN=Public Key Services,CN=Services,%6%11"
                         2016-10-07 15:21 - Minor bugfixes and corrections based on PSSharper.
+                        2017-01-10 15:34 - Correction of typos. Clean up help text.
         .LINK
         https://www.gonjer.com
         http://www.zetup.se
@@ -42,26 +43,26 @@
 param (
 
     # Customer name that will belong in the Certificate Authority Name.
-    # Example: 'DEMO' will be "DEMO-ROOT-CA"
+    # Example: 'Contoso' will be "Contoso-ROOT-CA"
     [Parameter(
             Mandatory = $true,
-            HelpMessage = "Customer name that will belong in the Certificate Authority Name.`nExample: 'DEMO'`n'DEMO' will be 'DEMO-ROOT-CA'"
+            HelpMessage = "Customer name that will belong in the Certificate Authority Name.`nExample: 'Contoso'`n'Contoso' will be 'Contoso-ROOT-CA'"
     )]
     [string]$Customer,
 
     # URL for CRL and AIA publishing from the Subordinate CA.
-    # Example: 'pki.demo.com'
+    # Example: 'pki.contoso.com'
     [Parameter(
             Mandatory = $true,
-            HelpMessage = "Domain URL for CRL and AIA publishing.`nExample: 'pki.demo.com'"
+            HelpMessage = "Domain URL for CRL and AIA publishing.`nExample: 'pki.contoso.com'"
     )]
     [string]$DomainURL,
 
     # Active Directory Configuration Naming Context where the Subordinate Certificate Authority will be placed.
-    # Example: 'CN=Configuration,DC=demo,DC=lab'
+    # Example: 'CN=Configuration,DC=contoso,DC=com'
     [Parameter(
             Mandatory = $true,
-            HelpMessage = "Active Directory Configuration Naming Context where the Subordinate Certificate Authority will be placed.`nExample: 'CN=Configuration,DC=demo,DC=lab'"
+            HelpMessage = "Active Directory Configuration Naming Context where the Subordinate Certificate Authority will be placed.`nExample: 'CN=Configuration,DC=contoso,DC=com'"
     )]
     [string]$ConfigNC,
 
@@ -120,7 +121,7 @@ process
     if ($PSCmdlet.ShouldProcess("$($Customer)($($DomainURL)) - $($LocalPKIPath)",'Configure Offline CA'))
     {
         #region Create directories
-        $certdb = New-Item -Path "$($LocalPKIPath)\Database\CertDB" -ItemType Directory -Force
+        $certdb  = New-Item -Path "$($LocalPKIPath)\Database\CertDB" -ItemType Directory -Force
         $certlog = New-Item -Path "$($LocalPKIPath)\Database\CertLog" -ItemType Directory -Force
         $webpath = New-Item -Path "$($LocalPKIPath)\Web" -ItemType Directory -Force
         $crlpath = New-Item -Path "$($LocalPKIPath)\Web\CRL" -ItemType Directory -Force
@@ -136,7 +137,7 @@ process
         {
             Write-Warning -Message 'Unable to install Windows Feature ADCS-Cert-Authority'
             Write-Warning -Message "$($_.Exception.Message)"
-            break
+            return
         }
         #endregion Install Windowsfeature ADCS-Cert-Authority
 
@@ -150,7 +151,7 @@ Policies=InternalUseOnly
 [Certsrv_Server]
 RenewalKeyLength=4096
 RenewalValidityPeriod=Years
-RenewalValidityPeriodUnits=20
+RenewalValidityPeriodUnits=10
 CRLPeriod=Years
 CRLPeriodUnits=1
 CRLDeltaPeriod=Days
@@ -210,8 +211,8 @@ Empty=True'
         # Declare Configuration and Domain NCs
         $null = & "$env:windir\system32\certutil.exe" -setreg ca\DSConfigDN $ConfigNC
 
-        # Set Validity Period for Issued Certificates (Subordinate) to 10 years
-        $null = & "$env:windir\system32\certutil.exe" -setreg ca\ValidityPeriodUnits 10
+        # Set Validity Period for Issued Certificates (Subordinate) to 5 years
+        $null = & "$env:windir\system32\certutil.exe" -setreg ca\ValidityPeriodUnits 5
         $null = & "$env:windir\system32\certutil.exe" -setreg ca\ValidityPeriod 'Years'
 
         # Define CRL Publication Intervals
@@ -261,7 +262,7 @@ Empty=True'
         }
         try
         {
-            Start-Service -Name 'certsvc' -Confirm:$false -WarningAction SilentlyContinue -ErrorAction Stop
+            $null = Start-Service -Name 'certsvc' -Confirm:$false -WarningAction SilentlyContinue -ErrorAction Stop
         }
         catch
         {
@@ -293,8 +294,11 @@ Empty=True'
         {
             Write-Output -InputObject 'Errors were deteted while running the script, displaying errors:'
             Start-Sleep -Milliseconds 500
-            $Error.ForEach{"$($_.Exception.Message)`n"}
-            Write-Output -InputObject 'Done?'
+            foreach ($e in $Error)
+            {
+                "$($e.Exception.Message)"
+            }
+            Write-Output -InputObject 'Does everything look OK?'
             Confirm-ToContinue
         }
         #region View all errors
