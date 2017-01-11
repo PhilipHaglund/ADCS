@@ -31,7 +31,7 @@
                         2017-01-11 07:39 - Change HTML body. Rewrite help. Fix typos.
 
         .LINK
-        http://www.gonjer.com
+        https://www.gonjer.com
     #>
     [cmdletbinding()]
     param (
