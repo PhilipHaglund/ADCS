@@ -106,8 +106,8 @@ begin
     #region Create a prompt function to allow for manual steps in the script.
     function Confirm-ToContinue
     {
-        $caption = 'Manual Step'  
-        $message = 'Are you done with the manual step?'
+        $caption = 'Manual Step'
+        $message = 'Are you done with the manual step(s)?'
         [int]$defaultChoice = 1
         $yes = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Yes', 'Done with manual step.'
         $no = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&No', 'Not done, continue to prompt.'
@@ -1168,45 +1168,49 @@ $webconfig = @'
         Write-Output -InputObject 'The next steps are manual for security reasons.'
 
         Write-Output -InputObject "`nStep 1: Create DNS-Zone."
-        Write-Output -InputObject "Create a DNS-Zone with the name $DomainURL and create a A-record pointing to this server IP ($ipaddress)"
+        Write-Output -InputObject "Create a DNS-Zone with the name $DomainURL or/and create a A-record pointing to this server IP ($ipaddress) on the internal DNS servers."
+        Write-Output -InputObject 'It is highly recommended to create an external DNS-record '
         Confirm-ToContinue
 
-        Write-Output -InputObject "`nStep 2: Submit and issue the Subordinate CA certificate on the Root CA:"
-        Write-Output -InputObject "Copy the request file (C:\$($Customer)-Subordinate-CA.req) to the Root CA server."
-        Write-Output -InputObject "Run 'Submit a new request' in the 'CertSrv.msc' GUI."
-        Write-Output -InputObject "Run 'Issue Certificate' in the 'CertSrv.msc' GUI, under 'Pending requests'."
-        Write-Output -InputObject "Export the issued Subordinate CA Certificate from 'CertSrv.msc' GUI, under 'Issued certificates'. Save the export file to $($LocalPKIPath)\$($Customer)-Subordinate-CA.P7B'"
+        Write-Output -InputObject "`nStep 2: Submit and issue the Subordinate CA certificate on the Root CA."
+        Write-Output -InputObject "Zip and/or move/copy the request file (C:\$($Customer)-Subordinate-CA.req) to the Root CA server (location doesn't matter) in a secure way."
+        Write-Output -InputObject 'Tip 1: Temporary enable Copy/Paste (drag-and-drop) in your virtual envoronment.'
+        Write-Output -InputObject 'Tip 2: Use a USB-device to copy the request file.'
+        Write-Output -InputObject "Run 'Submit a new request' in the 'CertSrv.msc' GUI on the Root CA server."
+        Write-Output -InputObject "Run 'Issue Certificate' in the 'CertSrv.msc' GUI, under 'Pending requests' on the Root CA server."
+        Write-Output -InputObject 'Export the issued Subordinate CA Certificate from "CertSrv.msc" GUI, under "Issued certificates" on the Root CA server.'.
+        Write-Output -InputObject "Save the export file to $($LocalPKIPath)\$($Customer)-Subordinate-CA.P7B' on the Root CA server."
         Confirm-ToContinue
 
-        Write-Output -InputObject "`nStep 3: Publish a new CRL:"
-        Write-Output -InputObject "On the Root Certificate Authority run 'certutil.exe -crl' to publish a new CRL to the location '$($crlpath.FullName)\$($Customer)-ROOT-CA.crl'."
+        Write-Output -InputObject "`nStep 3: Publish a new CRL."
+        Write-Output -InputObject "On the Root Certificate Authority run 'certutil.exe -crl' in cmd/Powershell to publish a new CRL to the location '$($crlpath.FullName)\$($Customer)-ROOT-CA.crl'."
         Confirm-ToContinue
 
-        Write-Output -InputObject "`nStep 4: Remove the 'Root CA Computername' from the AIA file(s):"
-        Write-Output -InputObject "The CRT files in $($aiapath.Fullname) may contain the computername of the Root CA, remove that from the crt file including the traling underscore '_'."
+        Write-Output -InputObject "`nStep 4: Remove the 'Root CA Computername' from the AIA file(s)."
+        Write-Output -InputObject "The CRT file(s) in $($aiapath.Fullname) may contain the computername of the Root CA, remove that from the crt file including the trailing underscore '_'."
         Write-Output -InputObject "Example: '$($aiapath.Fullname)\OfflineRootCA_$($Customer)-ROOT-CA.crt' should be $($aiapath.Fullname)\$($Customer)-ROOT-CA.crt"
         Confirm-ToContinue
 
-        Write-Output -InputObject "`nStep 5: Zip and/or copy the CRL and CRT files to the Subordinate Certificate Authority in a secure way:"
+        Write-Output -InputObject "`nStep 5: Zip and/or move/copy the CRL and CRT files to the Subordinate Certificate Authority in a secure way."
         Write-Output -InputObject 'Tip 1: Temporary enable Copy/Paste (drag-and-drop) in your virtual envoronment.'
         Write-Output -InputObject 'Tip 2: Use a USB-device to copy the files.'
         Write-Output -InputObject 'DO NOT USE ANY FORM OF NETWORK CONNECTION ON THE ROOT CERTIFICATE AUTHORITY!'
-        Write-Output -InputObject 'The following files need to be copied to the Subordinate CA:'
+        Write-Output -InputObject "The following files need to be copied to the Subordinate CA:`n"
         Write-Output -InputObject "$($LocalPKIPath)\$($Customer)-Subordinate-CA.P7B"
         Write-Output -InputObject "$($crlpath.FullName)\$($Customer)-ROOT-CA.crl"
         Write-Output -InputObject "$($aiapath.FullName)\$($Customer)-ROOT-CA.crt"
+        Write-Output -InputObject "Assuming that the installation path for Root CA is $($LocalPKIPath)"
         Confirm-ToContinue
 
-        Write-Output -InputObject "`nStep 6: Unzip/Paste the Root CA files to the correct Subordinate CA paths:"
+        Write-Output -InputObject "`nStep 6: Unzip/Paste the Root CA files to the correct Subordinate CA paths."
         Write-Output -InputObject "Move the $($Customer)-ROOT-CA.crt file to the Subordinate AIA filepath $($aiapath.Fullname)."
         Write-Output -InputObject "Move the $($Customer)-ROOT-CA.crl file to the Subordinate CRL filepath $($crlpath.Fullname)."
         Write-Output -InputObject "Move the $($Customer)-Subordinate-CA.P7B file to the Subordinate filepath $($LocalPKIPath)."
         Confirm-ToContinue
 
-        Write-Output -InputObject "`nStep 7: Add the Root CA the Active Directory Configuration Naming Context:"
-        Write-Output -InputObject "Run: 'Certutil -dspublish -f $($Customer)-ROOT-CA.crt RootCA'"
-        Write-Output -InputObject 'Starting a new Powershell process.'
-        Start-Process -FilePath Powershell.exe -Verb RunAs -WorkingDirectory "$($webpath.Fullname)" -ArgumentList '-NoLogo -NoProfile -NoExit -Command "& {
+        Write-Output -InputObject "`nStep 7: Automatically adding the Root CA certificate to the Active Directory Configuration Naming Context."
+        Write-Output -InputObject "Starting a new hidden Powershell process, running 'Certutil -dspublish -f $($Customer)-ROOT-CA.crt RootCA'"
+        Start-Process -FilePath Powershell.exe -Verb RunAs -WorkingDirectory "$($webpath.Fullname)" -WindowStyle Hidden -ArgumentList '-NoLogo -NoProfile -Command "& {
             $files = Get-ChildItem -Recurse | Where-Object -FilterScript {
             $_.Name -like ''*ROOT*.crt'' -or $_.Name -like ''*ROOT*.crl''
             }
@@ -1216,27 +1220,40 @@ $webconfig = @'
             {
             if ($file -like ''*.crt'')
             {
+            $null = & "$env:windir\system32\certutil.exe" -dspublish -f $file RootCA
             Write-Output -InputObject """Certutil.exe -dspublish -f ''$file'' RootCA"""
             }
         }}"'
         $null = & "$env:windir\system32\gpupdate.exe" /force
-        Confirm-ToContinue
 
-        Write-Output -InputObject "`nStep 8: Install the Subordinate Certificate:"
+        $rootcount = 0
+        $testreplication = $false
+        do
+        {
+            $testreplication = ([adsi]"LDAP://CN=Certification Authorities,CN=Public Key Services,CN=Services,$confignc").Children.Name -match 'ROOT'
+        
+            Write-Progress -Activity 'Waiting for Active Directory Replication' -PercentComplete ($rootcount * 10) -Status "Searching for Root CA certificate in 'CN=Certification Authorities,CN=Public Key Services,CN=Services,$confignc'"
+            Start-Sleep -Seconds 3
+            $rootcount++
+        }
+        until ($testreplication -eq $true -or $rootcount -gt 10)
+        Confirm-ToContinue
+        
+
+        Write-Output -InputObject "`nStep 8: Install the Subordinate Certificate."
         Write-Output -InputObject "Opening 'CertSrv.msc' (Right click the Subordinate CA and choose 'Install' and select the '$($LocalPKIPath)\$($Customer)-Subordinate-CA.P7B' file)."
         Write-Output -InputObject 'If prompted that the Root Certificate CA is not trusted. The Root-CA Certificate is not yet replicated through the Active Directory.'
-        Write-Output -InputObject 'Press cancel and redo the Install Subordinate Certificate process after a minute or two.'
+        Write-Output -InputObject 'Press cancel and redo the Install Subordinate Certificate process after a minute or two or make sure that the Root Certificate is replicated by verifying using "repadmin /replsum".'
         Start-Process -FilePath certsrv.msc
         Confirm-ToContinue
 
-        Write-Output -InputObject "`nRecommended Step: Configure a top level Group Policy for Auto enrollment:"
+        Write-Output -InputObject "`nRecommended Step: Configure a top level Group Policy for Auto Enrollment."
         Write-Output -InputObject "Open gpedit.msc and create a new Group Policy in the domain root. Example: $($Customer)-AutoEnrollment"
         Write-Output -InputObject 'Configure both Computer Configuration (CC) and User Configuration (UC).'
         Write-Output -InputObject 'CC or CU\Windows Settings\Security Settings\Public Key Policies\Certificate Services Client - Auto-Enrollment.'
         Write-Output -InputObject 'Choose "Enabled" in the drop down list. Enable(tick) both options:'
         Write-Output -InputObject 'Renew expired certificates, update pending certificate, and remove revoked certificates.'
         Write-Output -InputObject 'Update certificates that user certificate templates.'
-        Start-Process -FilePath certsrv.msc
         Confirm-ToContinue
         
         try
@@ -1254,7 +1271,7 @@ $webconfig = @'
 
         try
         {
-            $null = Stop-Service -Name 'certsvc' -Force -ErrorAction Stop -WarningAction SilentlyContinue
+            $null = Stop-Service -Name 'certsvc' -Confirm:$false -Force -ErrorAction Stop -WarningAction SilentlyContinue
         }
         catch
         {

@@ -304,7 +304,7 @@ Empty=True'
         #region View all errors
 
         Write-Output -InputObject "`nFinished installing and configuring the Root Certificate Authority."
-        Write-Output -InputObject 'The next step are are to install the Subordinate Certificate Authority.'
+        Write-Output -InputObject 'The next step is to install the Subordinate Certificate Authority.'
     }
 }
 end
