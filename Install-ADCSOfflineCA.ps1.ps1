@@ -182,7 +182,7 @@ Empty=True'
             -DatabaseDirectory $($certdb.FullName) `
             -LogDirectory $($certlog.FullName) `
             -ValidityPeriod Years `
-            -ValidityPeriodUnits 20 `
+            -ValidityPeriodUnits 10 `
             -OverwriteExistingKey `
             -WarningAction SilentlyContinue `
             -ErrorAction Stop `
@@ -202,7 +202,7 @@ Empty=True'
                 -DatabaseDirectory '$($certdb.FullName)'
                 -LogDirectory '$($certlog.FullName)'
                 -ValidityPeriod Years
-                -ValidityPeriodUnits 20"
+                -ValidityPeriodUnits 10"
             Confirm-ToContinue
         }
         #endregion Install-AdcsCertificationAuthority
