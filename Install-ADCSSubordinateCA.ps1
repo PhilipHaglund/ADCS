@@ -9,7 +9,7 @@
         Tested on Windows Server 2012R2 and Server 2016.
 
         .EXAMPLE
-        Install-ADCSSubordinateCA.ps1 -Customer Demo -DomainURL pki.demo.com
+        Install-ADCSSubordinateCA.ps1 -Company Demo -DomainURL pki.demo.com
 
         This will install the install and configure the Certificate Authority Service with the CA name "Demo-Subordinate-CA".
         It will create the PKI folder in the default location ("$env:SystemDrive\PKI").
@@ -19,12 +19,18 @@
 
 
         .EXAMPLE
-        Install-ADCSSubordinateCA.ps1 -Customer Contoso -DomainURL pki.contoso.com -LocalPKIPath E:\CALocation
+        Install-ADCSSubordinateCA.ps1 -Company Contoso -DomainURL pki.contoso.com -LocalPKIPath E:\CALocation
 
         This will install the install and configure the Certificate Authority Service with the CA name "Contoso-Subordinate-CA".
         It will create a folder named CALocation in E:\.
         The PKI folder contains the Database and paths for AIA and CRL.
         A Web Virtual Directory will be created with the name PKI mapped to "E:\CALocation\Web"
+        
+        
+        .INPUTS
+        String
+        IO.DirectoryInfo
+        mailaddress
             
         .NOTES
         Created on:     2016-05-11 09:15
@@ -49,13 +55,13 @@
 )]
 param (
 
-    # Customer name that will belong in the Certificate Authority Name.
+    # Company name that will belong in the Certificate Authority Name.
     # Example: 'DEMO' will be "DEMO-Subordinate-CA"
     [Parameter(
             Mandatory = $true,
-            HelpMessage = "Customer name that will belong in the Certificate Authority Name.`nExample: 'DEMO'`n'DEMO' will be 'DEMO-Subordinate-CA'"
+            HelpMessage = "Company name that will belong in the Certificate Authority Name.`nExample: 'DEMO'`n'DEMO' will be 'DEMO-Subordinate-CA'"
     )]
-    [string]$Customer,
+    [string]$Company,
 
     # Domain URL for CRL and AIA publishing. Also used for the fileshare path.
     # Example: 'pki.demo.com'
@@ -68,7 +74,7 @@ param (
     # Local file path to store Certificate Database and Logs. Also used for creating Web directory and fileshare location.
     # Example: 'C:\PKI'    
     [Alias('Path')]
-    [string]$LocalPKIPath = "$env:SystemDrive\PKI",
+    [IO.DirectoryInfo]$LocalPKIPath = "$env:SystemDrive\PKI",
 
     # A valid SMTP Server used to send information messages about PKI maintenance.
     [Parameter(
@@ -102,45 +108,7 @@ param (
 )
 
 begin
-{
-    #region Create a prompt function to allow for manual steps in the script.
-    function Confirm-ToContinue
-    {
-        $caption = 'Manual Step'
-        $message = 'Are you done with the manual step(s)?'
-        [int]$defaultChoice = 1
-        $yes = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Yes', 'Done with manual step.'
-        $no = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&No', 'Not done, continue to prompt.'
-        $cancel = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Cancel', 'Not done, exit script.'
-        $options = [Management.Automation.Host.ChoiceDescription[]]($yes, $no, $cancel)
-        
-        $do = $true
-        do
-        {            
-            $choice = $Host.ui.PromptForChoice($caption,$message, $options,$defaultChoice)
-            switch ($choice)
-            {
-                0 
-                {
-                    $do = $false
-                }
-                1 
-                {
-                    'Not done, continue to prompt.'
-                    $do = $true
-                }
-                Default 
-                {
-                    'Cancel, exiting script.'
-                    $do = $false
-                    break
-                }
-            }
-        }
-        while ($do)
-    }
-    #endregion Create a prompt function to allow for manual steps in the script.
-
+{    
     function Add-ScheduledPKIMaintenance
     {
         <#
@@ -152,11 +120,11 @@ begin
             Default the task will be run every 91 days. 
             
             .EXAMPLE
-            Add-ScheduledPKIMaintenance -CRTFile 'C:\Windows\system32\certsrv\CertEnroll\Contoso-Subordinate-CA.crt' -MaintenanceScriptFile 'C:\PKI\PKI-MaintenanceJob.ps1' -Customer Contoso -SMTPServer smtp.contoso.net -ToAddress recipient@contoso.com -FromAddress noreply@contoso.com
+            Add-ScheduledPKIMaintenance -CRTFile 'C:\Windows\system32\certsrv\CertEnroll\Contoso-Subordinate-CA.crt' -MaintenanceScriptFile 'C:\PKI\PKI-MaintenanceJob.ps1' -Company Contoso -SMTPServer smtp.contoso.net -ToAddress recipient@contoso.com -FromAddress noreply@contoso.com
             
             Creates and register a Scheduled Task containing a Powershell script action that will send a mail containing a recommended to do list for a three month PKI maintenance job.
             The parameters ToAddress, FromAddress and SMTP server will be outputed in the Action script (Example: C:\PKI\PKI-MaintenanceJob.ps1).
-            The parameter Customer is used to populate the HTML body text and Subject string in POwershell action script.
+            The parameter Company is used to populate the HTML body text and Subject string in POwershell action script.
     
             .INPUTS
             String
@@ -168,17 +136,18 @@ begin
             Created by:     Philip Haglund
             Organization:   Gonjer.com
             Filename:       Add-ScheduledPKIMaintenance.ps1
-            Version:        0.1
+            Version:        0.2
             Requirements:   Powershell 3.0
             Changelog:      2017-01-04 09:22 - Creation of script.
                             2017-01-11 07:39 - Change HTML body. Rewrite help. Fix typos.
+                            2017-01-20 15:01 - More bug fixes and typo corrections.
     
             .LINK
-            http://www.gonjer.com
+            https://www.gonjer.com
         #>
         [cmdletbinding()]
         param (
-            # Specify a fully qualified file path for the .CRT File.
+            # Specify a fully qualified file path for the .CRT file.
             [Parameter(
                     Mandatory = $True,
                     ValueFromPipelineByPropertyName = $True,
@@ -209,14 +178,14 @@ begin
             [ValidatePattern('^.*\.ps1$')]
             [IO.FileInfo]$MaintenanceScriptFile,
     
-            # A Customer Name used to populate the email template with correct information.
+            # A Company name used to populate the email template with correct information.
             [Parameter(
                     Mandatory = $True,
                     ValueFromPipelineByPropertyName = $True,
                     HelpMessage = 'Contoso'
             )]
             [ValidateNotNullOrEmpty()]
-            [string]$Customer,
+            [string]$Company,
     
             # A valid SMTP Server used to send information messages about PKI maintenance.
             [Parameter(
@@ -253,7 +222,7 @@ begin
             $body = @"
 "<h1><span style='font-size:14px;'><span style='font-family: verdana,geneva,sans-serif;'>It&#39;s time for PKI maintenance!</span></span></h1>
 
-<p><span style='font-size:11px;'><span style='font-family: verdana,geneva,sans-serif;'>It was three months ago since the last PKI maintenance for $($Customer).</span></span></p>
+<p><span style='font-size:11px;'><span style='font-family: verdana,geneva,sans-serif;'>It was three months ago since the last PKI maintenance for $($Company).</span></span></p>
 
 <p><span style='font-size:11px;'><span style='font-family: verdana,geneva,sans-serif;'>Follow the to-do list below to keep the PKI structure/environment healthy and up to date.<br />
 <em>The to-do list is just a recomendation, not a forced task list.</em></span></span><br />
@@ -308,7 +277,7 @@ Send-MailMessage ``
 -Encoding ([System.Text.Encoding]::UTF8) ``
 -From '$($FromAddress)' ``
 -SmtpServer '$($SMTPServer)' ``
--Subject 'PKI maintenance - $($Customer)' ``
+-Subject 'PKI maintenance - $($Company)' ``
 -Body $($body)
 "@
             try
@@ -350,17 +319,216 @@ Send-MailMessage ``
                 $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
                 $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every 3 months.' -ErrorAction Stop
     
-                Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Customer) - PKI 3 Month Maintenance" -Force -ErrorAction Stop
+                Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - PKI 3 Month Maintenance" -Force -ErrorAction Stop
             }
             catch
             {
-                Write-Warning -Message "Unable to create a ScheduledTask containing '$($Customer) - PKI 3 Month Maintenance' - $($_.Exception.Message)"
+                Write-Warning -Message "Unable to create a ScheduledTask containing '$($Company) - PKI 3 Month Maintenance' - $($_.Exception.Message)"
                 Write-Output -InputObject 'Contact your PKI Administrator!'
                 break
             }
         }    
     }
+    function Confirm-ToContinue
+    {
+        $caption = 'Manual Step'
+        $message = 'Are you done with the manual step(s)?'
+        [int]$defaultChoice = 1
+        $yes = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Yes', 'Done with manual step.'
+        $no = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&No', 'Not done, continue to prompt.'
+        $cancel = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Cancel', 'Not done, exit script.'
+        $options = [Management.Automation.Host.ChoiceDescription[]]($yes, $no, $cancel)
+        
+        $do = $true
+        do
+        {            
+            $choice = $Host.ui.PromptForChoice($caption,$message, $options,$defaultChoice)
+            switch ($choice)
+            {
+                0 
+                {
+                    $do = $false
+                }
+                1 
+                {
+                    'Not done, continue to prompt.'
+                    $do = $true
+                }
+                Default 
+                {
+                    'Cancel, exiting script.'
+                    $do = $false
+                    break
+                }
+            }
+        }
+        while ($do)
+    }
+    function Edit-Certdat
+    {
+    <#
+        .SYNOPSIS
+        Edits the Certdat.inc file located in under WinDir\System32\certsrv (C:\Windows\System32\CertSrv).
+        
+        .DESCRIPTION
+        Edits the Certdat.inc file based on the input to match the company properties.
+        Will modify the following set of variables:
 
+        sDefaultCompany=""
+	    sDefaultOrgUnit=""
+	    sDefaultLocality=""
+	    sDefaultState=""
+	    sDefaultCountry=""	   
+	    sServerDisplayName=""
+                
+        .EXAMPLE
+        Edit-Certdat -Company 'Contoso' -City 'Gothenburg' -State VG
+        
+        This will modify the file 'C:\Windows\system32\certsrv\certdat.inc' and change the following variables:
+
+        sDefaultCompany="Contoso"
+	    sDefaultOrgUnit="IT"
+	    sDefaultLocality="Gothenburg"
+	    sDefaultState="VG"
+	    sDefaultCountry="Sweden"	   
+	    sServerDisplayName="Contoso - Certificate Authority"
+        
+        .EXAMPLE
+        Edit-Certdat -CertdatFile 'E:\Windows\system32\certsrv\certdat.inc' -Company 'Contoso DK' -OrgUnit 'Information Technology' -City 'Copenhagen' -State 'Hovedstaden' -Country 'Denmark'
+        
+        This will modify the file 'E:\Windows\system32\certsrv\certdat.inc' and change the following variables:
+
+        sDefaultCompany="Contoso DK"
+	    sDefaultOrgUnit="Information Technology"
+	    sDefaultLocality="Copenhagen"
+	    sDefaultState="Hovedstaden"
+	    sDefaultCountry="Denmark"	   
+	    sServerDisplayName="Contoso DK - Certificate Authority"
+        
+        .INPUTS
+        IO.FileInfo
+        String        
+        
+        .NOTES
+        Created on:     2017-01-20 13:48
+        Created by:     Philip Haglund
+        Organization:   Gonjer.com
+        Filename:       Edit-Certdat.ps1
+        Version:        0.1
+        Requirements:   Powershell 3.0
+        Changelog:      2017-01-20 13:48 - Creation of script.
+                        
+        
+        .LINK
+        https://www.gonjer.com
+    #>
+
+    [cmdletbinding()]
+    param (
+        # Specify a fully qualified file path for the certdat.inc file.
+        # Example: C:\Windows\system32\certsrv\certdat.inc
+        [Parameter(
+                    ValueFromPipelineByPropertyName = $True
+        )]
+        [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^.*\.inc$')]
+        [ValidateScript({
+                    if (Test-Path -Path $_)
+                    {
+                        $True
+                    }
+                    else
+                    {
+                        throw "The path '$_' is not available."
+                    }
+        })]
+        [Alias('dat')]
+        [IO.FileInfo]$CertdatFile = "$env:windir\system32\certsrv\certdat.inc",
+
+        # A Company name used to populate the certdat.inc file with correct information.
+        [Parameter(
+                Mandatory = $True,
+                ValueFromPipelineByPropertyName = $True,
+                HelpMessage = 'Contoso'
+        )]
+        [ValidateNotNullOrEmpty()]
+        [string]$Company,
+
+        # An organizational unit used to populate the certdat.inc file with correct information.
+        # Example: IT
+        [Parameter(
+                ValueFromPipelineByPropertyName = $True
+        )]
+        [ValidateNotNullOrEmpty()]
+        [string]$OrgUnit = 'IT',
+
+        # A city used to populate the certdat.inc file with correct information.
+        # Example: Gothenburg
+        [Parameter(
+                Mandatory = $True,
+                ValueFromPipelineByPropertyName = $True,
+                HelpMessage = 'Gothenburg'
+        )]
+        [ValidateNotNullOrEmpty()]
+        [string]$City,
+
+        # A state used to populate the certdat.inc file with correct information.
+        # Example: VG
+        [Parameter(
+                Mandatory = $True,
+                ValueFromPipelineByPropertyName = $True,
+                HelpMessage = 'VG'
+        )]
+        [ValidateNotNullOrEmpty()]
+        [string]$State,
+
+        # A state used to populate the certdat.inc file with correct information.
+        # Example: VG
+        [Parameter(
+                ValueFromPipelineByPropertyName = $True                
+        )]
+        [ValidateNotNullOrEmpty()]
+        [string]$Country = 'Sweden'
+    )
+    begin
+    {
+        $warningtext = 'Will not create modify the Web Enrollment page.'
+
+        try
+        {
+            $content = Get-Content -Path $CertdatFile -ErrorAction Stop
+        }
+        catch
+        {
+            Write-Error -Message "Unable to open the file $($CertdatFile) - $($_.Exception.Message)"
+            Write-Warning -Message $warningtext
+            break
+        }       
+    }
+    process
+    {
+        # A set or variables containing the regex relace strings
+        $sdefaultcompany    = 'sDefaultCompany\=\"(.+|)\"', "sDefaultCompany=`"$Company`""
+        $sdefaultorgUnit    = 'sDefaultOrgUnit\=\"(.+|)\"', "sDefaultOrgUnit=`"$OrgUnit`""
+        $sdefaultlocality   = 'sDefaultLocality\=\"(.+|)\"', "sDefaultLocality=`"$City`""
+        $sdefaultstate      = 'sDefaultState\=\"(.+|)\"', "sDefaultState=`"$State`""
+        $sdefaultcountry    = 'sDefaultCountry\=\"(.+|)\"', "sDefaultCountry=`"$Country`""
+        $sserverdisplayname = 'sServerDisplayName\=\"(.+|)\"', "sServerDisplayName=`"$Company - Certificate Authority`""
+
+        $modcontent = $content -replace $sdefaultcompany -replace $sdefaultorgUnit -replace $sdefaultlocality -replace $sdefaultstate -replace $sdefaultcountry -replace $sserverdisplayname
+
+        try
+        {
+            $modcontent | Set-Content -Path $CertdatFile -Force -Encoding UTF8
+        }
+        catch
+        {
+            Write-Error -Message "Unable to modiofy the file $($CertdatFile) - $($_.Exception.Message)"
+            Write-Warning -Message $warningtext
+            break
+        }
+    }
+}
     function Register-CABackup
     {
         <#
@@ -374,7 +542,7 @@ Send-MailMessage ``
             All credits for the Backup-CertificationAuthority.ps1 script goes to @Crypt32 (Vadims Podāns), the script is untouched, only used in the backupscript-scriptblock.        
         
             .EXAMPLE
-            Register-CABackup -CABackupScriptFile 'C:\PKI\Backup-CertificationAuthority.ps1' -RemoveCABackupScriptFile 'C:\PKI\Remove-CABackupFiles.ps1' -Customer Contoso
+            Register-CABackup -CABackupScriptFile 'C:\PKI\Backup-CertificationAuthority.ps1' -RemoveCABackupScriptFile 'C:\PKI\Remove-CABackupFiles.ps1' -Company Contoso
     
             Creates and register two Scheduled Tasks each containing a Powershell script action 'C:\PKI\Backup-CertificationAuthority.ps1' / 'C:\PKI\Remove-CABackupFiles.ps1'.
             
@@ -387,9 +555,10 @@ Send-MailMessage ``
             Created by:     Philip Haglund
             Organization:   Gonjer.com
             Filename:       Register-CABackup
-            Version:        0.1
+            Version:        0.2
             Requirements:   Powershell 3.0
             Changelog:      2017-01-11 12:13 - Creation of script.
+                            2017-01-20 15:00 - Typo corrections and bugfixes.
                             
     
             .LINK
@@ -417,20 +586,18 @@ Send-MailMessage ``
             [ValidatePattern('^.*\.ps1$')]
             [IO.FileInfo]$RemoveCABackupScriptFile,
     
-            # Customer name that belongs to the Certificate Authority Name.
+            # Company name that belongs to the Certificate Authority Name.
             [Parameter(
                     Mandatory = $true,
-                    HelpMessage = 'Customer name that will belong in the Certificate Authority Name.'
+                    HelpMessage = 'Company name that will belong in the Certificate Authority Name.'
             )]
-            [string]$Customer
+            [string]$Company
         )
         begin
         {
-            $date = Get-Date
-    
             #region Backupscript-scriptblock
             $backupscript = {            
-            [CmdletBinding()]
+            [cmdletbinding()]
     	        param(
     		        [Parameter(Mandatory = $true)]
     		        [IO.DirectoryInfo]$Path,
@@ -824,7 +991,7 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
                     Changelog:      2017-01-11 12:13 - Creation of script.
                 
                     .LINK
-                    http://www.gonjer.com
+                    https://www.gonjer.com
                 #>
                 [cmdletbinding()]
                 param (
@@ -898,16 +1065,16 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
             try
             {
                 $taskaction    = New-ScheduledTaskAction -Execute "$($PSHOME)\powershell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -Command `"& $CABackupScriptFile`"" -ErrorAction Stop
-                $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At (Get-Date 18:00) -WeeksInterval 1 -ErrorAction Stop
+                $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At (Get-Date -Date 18:00) -WeeksInterval 1 -ErrorAction Stop
                 $taskprincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType Interactive -RunLevel Highest -ErrorAction Stop
                 $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
                 $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every friday at 18:00.' -ErrorAction Stop
     
-                Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Customer) - Backup PKI" -Force -ErrorAction Stop
+                Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - Backup PKI" -Force -ErrorAction Stop
             }
             catch
             {
-                Write-Warning -Message "Unable to create a ScheduledTask containing '$($Customer) - Backup PKI' - $($_.Exception.Message)"
+                Write-Warning -Message "Unable to create a ScheduledTask containing '$($Company) - Backup PKI' - $($_.Exception.Message)"
                 Write-Output -InputObject 'Contact your PKI Administrator!'
                 return
             }
@@ -930,16 +1097,16 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
             try
             {
                 $taskaction    = New-ScheduledTaskAction -Execute "$($PSHOME)\powershell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -Command `"& $RemoveCABackupScriptFile`"" -ErrorAction Stop
-                $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At (Get-Date 22:00) -WeeksInterval 1 -ErrorAction Stop
+                $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At (Get-Date -Date 22:00) -WeeksInterval 1 -ErrorAction Stop
                 $taskprincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType Interactive -RunLevel Highest -ErrorAction Stop
                 $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
                 $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every sunday at 22:00.' -ErrorAction Stop
     
-                Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Customer) - Remove PKI Backup files" -Force -ErrorAction Stop
+                Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - Remove PKI Backup files" -Force -ErrorAction Stop
             }
             catch
             {
-                Write-Warning -Message "Unable to create a ScheduledTask containing '$($Customer) - Remove PKI Backup files' - $($_.Exception.Message)"
+                Write-Warning -Message "Unable to create a ScheduledTask containing '$($Company) - Remove PKI Backup files' - $($_.Exception.Message)"
                 Write-Output -InputObject 'Contact your PKI Administrator!'
                 return
             }
@@ -952,12 +1119,12 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
 }
 process
 {
-    if ($PSCmdlet.ShouldProcess("$($Customer)($($DomainURL)) - $($LocalPKIPath)",'Configure Subordinate CA'))
+    if ($PSCmdlet.ShouldProcess("$($Company)($($DomainURL)) - $($LocalPKIPath)",'Configure Subordinate CA'))
     {
         #region Get Local IP-address
         try
         {
-            $ipaddress = @(Get-WmiObject -Class Win32_NetworkAdapterConfiguration -ErrorAction Stop | Where-Object -FilterScript {
+            $ipaddress = @(Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -ErrorAction Stop | Where-Object -FilterScript {
                     $_.DefaultIpGateway
             })[0].IPAddress[0]
         }
@@ -972,7 +1139,7 @@ process
         #region Install Windowsfeature ADCS-Cert-Authority, Adcs-Web-Enrollment
         try
         {
-            $null = Install-WindowsFeature -Name ADCS-Cert-Authority, Adcs-Web-Enrollment -IncludeManagementTools -ErrorAction Stop
+            $null = Install-WindowsFeature -Name ADCS-Cert-Authority, ADCS-Web-Enrollment -IncludeManagementTools -ErrorAction Stop
         }
         catch
         {
@@ -1028,14 +1195,14 @@ Empty=True'
         try
         { 
             $null = Install-AdcsCertificationAuthority -CAType EnterpriseSubordinateCA `
-            -CACommonName "$Customer-Subordinate-CA" `
-            -CADistinguishedNameSuffix "OU=PKI,O=$Customer,C=SE" `
+            -CACommonName "$Company-Subordinate-CA" `
+            -CADistinguishedNameSuffix "OU=PKI,O=$Company,C=SE" `
             -KeyLength '2048' `
             -HashAlgorithmName 'SHA256' `
             -CryptoProviderName 'RSA#Microsoft Software Key Storage Provider' `
             -DatabaseDirectory "$($certdb.FullName)" `
             -LogDirectory "$($certlog.FullName)" `
-            -OutputCertRequestFile "C:\$($Customer)-Subordinate-CA.req" `
+            -OutputCertRequestFile "C:\$($Company)-Subordinate-CA.req" `
             -OverwriteExistingKey `
             -WarningAction SilentlyContinue `
             -ErrorAction Stop `
@@ -1048,14 +1215,14 @@ Empty=True'
             Write-Warning -Message "$($_.Exception.Message)"
             Write-Output -InputObject 'Manual install AdcsCertificationAuthority with the following properties:'
             Write-Output -InputObject "
-                -CACommonName '$Customer-Subordinate-CA'
-                -CADistinguishedNameSuffix 'OU=PKI,O=$Customer,C=SE'
+                -CACommonName '$Company-Subordinate-CA'
+                -CADistinguishedNameSuffix 'OU=PKI,O=$Company,C=SE'
                 -KeyLength '2048'
                 -HashAlgorithmName 'SHA256'
                 -CryptoProviderName 'RSA#Microsoft Software Key Storage Provider'
                 -DatabaseDirectory '$($certdb.FullName)'
                 -LogDirectory '$($certlog.FullName)'
-                -OutputCertRequestFile '$($LocalPKIPath)\$($Customer)-Subordinate-CA.req'
+                -OutputCertRequestFile '$($LocalPKIPath)\$($Company)-Subordinate-CA.req'
             -OverwriteExistingKey"
             Confirm-ToContinue
         }
@@ -1173,22 +1340,22 @@ $webconfig = @'
         Confirm-ToContinue
 
         Write-Output -InputObject "`nStep 2: Submit and issue the Subordinate CA certificate on the Root CA."
-        Write-Output -InputObject "Zip and/or move/copy the request file (C:\$($Customer)-Subordinate-CA.req) to the Root CA server (location doesn't matter) in a secure way."
+        Write-Output -InputObject "Zip and/or move/copy the request file (C:\$($Company)-Subordinate-CA.req) to the Root CA server (location doesn't matter) in a secure way."
         Write-Output -InputObject 'Tip 1: Temporary enable Copy/Paste (drag-and-drop) in your virtual envoronment.'
         Write-Output -InputObject 'Tip 2: Use a USB-device to copy the request file.'
         Write-Output -InputObject "Run 'Submit a new request' in the 'CertSrv.msc' GUI on the Root CA server."
         Write-Output -InputObject "Run 'Issue Certificate' in the 'CertSrv.msc' GUI, under 'Pending requests' on the Root CA server."
-        Write-Output -InputObject 'Export the issued Subordinate CA Certificate from "CertSrv.msc" GUI, under "Issued certificates" on the Root CA server.'.
-        Write-Output -InputObject "Save the export file to $($LocalPKIPath)\$($Customer)-Subordinate-CA.P7B' on the Root CA server."
+        Write-Output -InputObject 'Export the issued Subordinate CA Certificate from "CertSrv.msc" GUI, under "Issued certificates" on the Root CA server.'
+        Write-Output -InputObject "Save the export file to $($LocalPKIPath)\$($Company)-Subordinate-CA.P7B' on the Root CA server."
         Confirm-ToContinue
 
         Write-Output -InputObject "`nStep 3: Publish a new CRL."
-        Write-Output -InputObject "On the Root Certificate Authority run 'certutil.exe -crl' in cmd/Powershell to publish a new CRL to the location '$($crlpath.FullName)\$($Customer)-ROOT-CA.crl'."
+        Write-Output -InputObject "On the Root Certificate Authority run 'certutil.exe -crl' in cmd/Powershell to publish a new CRL to the location '$($crlpath.FullName)\$($Company)-ROOT-CA.crl'."
         Confirm-ToContinue
 
         Write-Output -InputObject "`nStep 4: Remove the 'Root CA Computername' from the AIA file(s)."
         Write-Output -InputObject "The CRT file(s) in $($aiapath.Fullname) may contain the computername of the Root CA, remove that from the crt file including the trailing underscore '_'."
-        Write-Output -InputObject "Example: '$($aiapath.Fullname)\OfflineRootCA_$($Customer)-ROOT-CA.crt' should be $($aiapath.Fullname)\$($Customer)-ROOT-CA.crt"
+        Write-Output -InputObject "Example: '$($aiapath.Fullname)\OfflineRootCA_$($Company)-ROOT-CA.crt' should be $($aiapath.Fullname)\$($Company)-ROOT-CA.crt"
         Confirm-ToContinue
 
         Write-Output -InputObject "`nStep 5: Zip and/or move/copy the CRL and CRT files to the Subordinate Certificate Authority in a secure way."
@@ -1196,32 +1363,31 @@ $webconfig = @'
         Write-Output -InputObject 'Tip 2: Use a USB-device to copy the files.'
         Write-Output -InputObject 'DO NOT USE ANY FORM OF NETWORK CONNECTION ON THE ROOT CERTIFICATE AUTHORITY!'
         Write-Output -InputObject "The following files need to be copied to the Subordinate CA:`n"
-        Write-Output -InputObject "$($LocalPKIPath)\$($Customer)-Subordinate-CA.P7B"
-        Write-Output -InputObject "$($crlpath.FullName)\$($Customer)-ROOT-CA.crl"
-        Write-Output -InputObject "$($aiapath.FullName)\$($Customer)-ROOT-CA.crt"
+        Write-Output -InputObject "$($LocalPKIPath)\$($Company)-Subordinate-CA.P7B"
+        Write-Output -InputObject "$($crlpath.FullName)\$($Company)-ROOT-CA.crl"
+        Write-Output -InputObject "$($aiapath.FullName)\$($Company)-ROOT-CA.crt"
         Write-Output -InputObject "Assuming that the installation path for Root CA is $($LocalPKIPath)"
         Confirm-ToContinue
 
         Write-Output -InputObject "`nStep 6: Unzip/Paste the Root CA files to the correct Subordinate CA paths."
-        Write-Output -InputObject "Move the $($Customer)-ROOT-CA.crt file to the Subordinate AIA filepath $($aiapath.Fullname)."
-        Write-Output -InputObject "Move the $($Customer)-ROOT-CA.crl file to the Subordinate CRL filepath $($crlpath.Fullname)."
-        Write-Output -InputObject "Move the $($Customer)-Subordinate-CA.P7B file to the Subordinate filepath $($LocalPKIPath)."
+        Write-Output -InputObject "Move the $($Company)-ROOT-CA.crt file to the Subordinate AIA filepath $($aiapath.Fullname)."
+        Write-Output -InputObject "Move the $($Company)-ROOT-CA.crl file to the Subordinate CRL filepath $($crlpath.Fullname)."
+        Write-Output -InputObject "Move the $($Company)-Subordinate-CA.P7B file to the Subordinate filepath $($LocalPKIPath)."
         Confirm-ToContinue
 
         Write-Output -InputObject "`nStep 7: Automatically adding the Root CA certificate to the Active Directory Configuration Naming Context."
-        Write-Output -InputObject "Starting a new hidden Powershell process, running 'Certutil -dspublish -f $($Customer)-ROOT-CA.crt RootCA'"
+        Write-Output -InputObject "Starting a new hidden Powershell process, running 'Certutil -dspublish -f $($Company)-ROOT-CA.crt RootCA'"
         Start-Process -FilePath Powershell.exe -Verb RunAs -WorkingDirectory "$($webpath.Fullname)" -WindowStyle Hidden -ArgumentList '-NoLogo -NoProfile -Command "& {
             $files = Get-ChildItem -Recurse | Where-Object -FilterScript {
-            $_.Name -like ''*ROOT*.crt'' -or $_.Name -like ''*ROOT*.crl''
-            }
-        
-            Write-Output -InputObject ''Run the following commands:''
+                $_.Name -like ''*ROOT*.crt'' -or $_.Name -like ''*ROOT*.crl''
+            }        
+            Write-Output -InputObject ''Publishing RootCA Certificate to Active Directory:''
             foreach ($file in $files.FullName)
             {
             if ($file -like ''*.crt'')
             {
-            $null = & "$env:windir\system32\certutil.exe" -dspublish -f $file RootCA
-            Write-Output -InputObject """Certutil.exe -dspublish -f ''$file'' RootCA"""
+                Write-Output -InputObject """Certutil.exe -dspublish -f ''$file'' RootCA"""
+                $null = & "$env:windir\system32\certutil.exe" -dspublish -f $file RootCA            
             }
         }}"'
         $null = & "$env:windir\system32\gpupdate.exe" /force
@@ -1241,16 +1407,16 @@ $webconfig = @'
         
 
         Write-Output -InputObject "`nStep 8: Install the Subordinate Certificate."
-        Write-Output -InputObject "Opening 'CertSrv.msc' (Right click the Subordinate CA and choose 'Install' and select the '$($LocalPKIPath)\$($Customer)-Subordinate-CA.P7B' file)."
+        Write-Output -InputObject "Opening 'CertSrv.msc' (Right click the Subordinate CA and choose 'Install' and select the '$($LocalPKIPath)\$($Company)-Subordinate-CA.P7B' file)."
         Write-Output -InputObject 'If prompted that the Root Certificate CA is not trusted. The Root-CA Certificate is not yet replicated through the Active Directory.'
         Write-Output -InputObject 'Press cancel and redo the Install Subordinate Certificate process after a minute or two or make sure that the Root Certificate is replicated by verifying using "repadmin /replsum".'
         Start-Process -FilePath certsrv.msc
         Confirm-ToContinue
 
-        Write-Output -InputObject "`nRecommended Step: Configure a top level Group Policy for Auto Enrollment."
-        Write-Output -InputObject "Open gpedit.msc and create a new Group Policy in the domain root. Example: $($Customer)-AutoEnrollment"
+        Write-Output -InputObject "`nRecommended Step: Configure a top level Group Policy for Certificate Auto Enrollment."
+        Write-Output -InputObject "Open gpedit.msc and create a new Group Policy in the domain root. Example: $($Company)-AutoEnrollment"
         Write-Output -InputObject 'Configure both Computer Configuration (CC) and User Configuration (UC).'
-        Write-Output -InputObject 'CC or CU\Windows Settings\Security Settings\Public Key Policies\Certificate Services Client - Auto-Enrollment.'
+        Write-Output -InputObject 'CC and CU\Windows Settings\Security Settings\Public Key Policies\Certificate Services Client - Auto-Enrollment.'
         Write-Output -InputObject 'Choose "Enabled" in the drop down list. Enable(tick) both options:'
         Write-Output -InputObject 'Renew expired certificates, update pending certificate, and remove revoked certificates.'
         Write-Output -InputObject 'Update certificates that user certificate templates.'
@@ -1295,29 +1461,29 @@ $webconfig = @'
         #region Copy all AIA (Certificates) from the original store to the new AIA-Path
         try
         {
-            Rename-Item -Path "$($env:windir)\system32\certsrv\certenroll\$($env:COMPUTERNAME).$($env:USERDNSDOMAIN)_$($Customer)-Subordinate-CA.crt" -NewName "$($Customer)-Subordinate-CA.crt" -ErrorAction Stop
-            Copy-Item -Path "$($env:windir)\system32\certsrv\certenroll\$($Customer)-Subordinate-CA.crt" -Destination $aiapath.FullName -ErrorAction Stop
+            Rename-Item -Path "$($env:windir)\system32\certsrv\certenroll\$($env:COMPUTERNAME).$($env:USERDNSDOMAIN)_$($Company)-Subordinate-CA.crt" -NewName "$($Company)-Subordinate-CA.crt" -ErrorAction Stop
+            Copy-Item -Path "$($env:windir)\system32\certsrv\certenroll\$($Company)-Subordinate-CA.crt" -Destination $aiapath.FullName -ErrorAction Stop
         }
         catch
         {
             if ($_.CategoryInfo.Activity -eq 'Rename-Item')
             {
-                Write-Warning -Message "Unable to Rename-Item $($env:windir)\system32\certsrv\certenroll\$($env:COMPUTERNAME).$($env:USERDNSDOMAIN)_$($Customer)-Subordinate-CA.crt"
-                Write-Output -InputObject "Manual rename the file to '$($Customer)-Subordinate-CA.crt'"
+                Write-Warning -Message "Unable to Rename-Item $($env:windir)\system32\certsrv\certenroll\$($env:COMPUTERNAME).$($env:USERDNSDOMAIN)_$($Company)-Subordinate-CA.crt"
+                Write-Output -InputObject "Manual rename the file to '$($Company)-Subordinate-CA.crt'"
             }
-            Write-Warning -Message "Unable to Copy-Item '$($env:windir)\system32\certsrv\certenroll\$($Customer)-Subordinate-CA.crt' to $($aiapath.FullName)"
+            Write-Warning -Message "Unable to Copy-Item '$($env:windir)\system32\certsrv\certenroll\$($Company)-Subordinate-CA.crt' to $($aiapath.FullName)"
             Write-Warning -Message "$($_.Exception.Message)"
             Write-Output -InputObject "Do a manual copy of '($env:windir)\system32\certsrv\certenroll\*.crt' to '$($aiapath.FullName)'"
             Confirm-ToContinue
         }
         #region Copy all AIA (Certificates) from the original store to the new AIA-Path
 
-        # Issue a new CRL
+        # Issuing a new CRL
         $null = & "$env:windir\system32\certutil.exe" -crl
 
         try
         {
-            Add-ScheduledPKIMaintenance -CRTFile "$($aiapath.FullName)\$($Customer)-Subordinate-CA.crt" -MaintenanceScriptFile "$($LocalPKIPath)\PKI-MaintenanceJob.ps1" -Customer $Customer -SMTPServer $SMTPServer -ToAddress $ToAddress -FromAddress $FromAddress -ErrorAction Stop
+            Add-ScheduledPKIMaintenance -CRTFile "$($aiapath.FullName)\$($Company)-Subordinate-CA.crt" -MaintenanceScriptFile "$($LocalPKIPath)\PKI-MaintenanceJob.ps1" -Company $Company -SMTPServer $SMTPServer -ToAddress $ToAddress -FromAddress $FromAddress -ErrorAction Stop
         }
         catch
         {
@@ -1329,7 +1495,7 @@ $webconfig = @'
 
         try
         {
-            Register-CABackup -CABackupScriptFile "$($LocalPKIPath)\Backup-CertificationAuthority.ps1" -RemoveCABackupScriptFile "$($LocalPKIPath)\Remove-CABackupFiles.ps1" -Customer $Customer -ErrorAction Stop
+            Register-CABackup -CABackupScriptFile "$($LocalPKIPath)\Backup-CertificationAuthority.ps1" -RemoveCABackupScriptFile "$($LocalPKIPath)\Remove-CABackupFiles.ps1" -Company $Company -ErrorAction Stop
         }
         catch
         {

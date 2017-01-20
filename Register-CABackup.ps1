@@ -11,7 +11,7 @@
         All credits for the Backup-CertificationAuthority.ps1 script goes to @Crypt32 (Vadims Podāns), the script is untouched, only used in the backupscript-scriptblock.        
     
         .EXAMPLE
-        Register-CABackup -CABackupScriptFile 'C:\PKI\Backup-CertificationAuthority.ps1' -RemoveCABackupScriptFile 'C:\PKI\Remove-CABackupFiles.ps1' -Customer Contoso
+        Register-CABackup -CABackupScriptFile 'C:\PKI\Backup-CertificationAuthority.ps1' -RemoveCABackupScriptFile 'C:\PKI\Remove-CABackupFiles.ps1' -Company Contoso
 
         Creates and register two Scheduled Tasks each containing a Powershell script action 'C:\PKI\Backup-CertificationAuthority.ps1' / 'C:\PKI\Remove-CABackupFiles.ps1'.
         
@@ -24,9 +24,10 @@
         Created by:     Philip Haglund
         Organization:   Gonjer.com
         Filename:       Register-CABackup
-        Version:        0.1
+        Version:        0.2
         Requirements:   Powershell 3.0
         Changelog:      2017-01-11 12:13 - Creation of script.
+                        2017-01-20 15:00 - Typo corrections and bugfixes.
                         
 
         .LINK
@@ -54,20 +55,18 @@
         [ValidatePattern('^.*\.ps1$')]
         [IO.FileInfo]$RemoveCABackupScriptFile,
 
-        # Customer name that belongs to the Certificate Authority Name.
+        # Company name that belongs to the Certificate Authority Name.
         [Parameter(
                 Mandatory = $true,
-                HelpMessage = 'Customer name that will belong in the Certificate Authority Name.'
+                HelpMessage = 'Company name that will belong in the Certificate Authority Name.'
         )]
-        [string]$Customer
+        [string]$Company
     )
     begin
     {
-        $date = Get-Date
-
         #region Backupscript-scriptblock
         $backupscript = {            
-        [CmdletBinding()]
+        [cmdletbinding()]
 	        param(
 		        [Parameter(Mandatory = $true)]
 		        [IO.DirectoryInfo]$Path,
@@ -461,7 +460,7 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
                 Changelog:      2017-01-11 12:13 - Creation of script.
             
                 .LINK
-                http://www.gonjer.com
+                https://www.gonjer.com
             #>
             [cmdletbinding()]
             param (
@@ -535,16 +534,16 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
         try
         {
             $taskaction    = New-ScheduledTaskAction -Execute "$($PSHOME)\powershell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -Command `"& $CABackupScriptFile`"" -ErrorAction Stop
-            $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At (Get-Date 18:00) -WeeksInterval 1 -ErrorAction Stop
+            $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At (Get-Date -Date 18:00) -WeeksInterval 1 -ErrorAction Stop
             $taskprincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType Interactive -RunLevel Highest -ErrorAction Stop
             $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
             $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every friday at 18:00.' -ErrorAction Stop
 
-            Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Customer) - Backup PKI" -Force -ErrorAction Stop
+            Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - Backup PKI" -Force -ErrorAction Stop
         }
         catch
         {
-            Write-Warning -Message "Unable to create a ScheduledTask containing '$($Customer) - Backup PKI' - $($_.Exception.Message)"
+            Write-Warning -Message "Unable to create a ScheduledTask containing '$($Company) - Backup PKI' - $($_.Exception.Message)"
             Write-Output -InputObject 'Contact your PKI Administrator!'
             return
         }
@@ -567,16 +566,16 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
         try
         {
             $taskaction    = New-ScheduledTaskAction -Execute "$($PSHOME)\powershell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -Command `"& $RemoveCABackupScriptFile`"" -ErrorAction Stop
-            $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At (Get-Date 22:00) -WeeksInterval 1 -ErrorAction Stop
+            $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At (Get-Date -Date 22:00) -WeeksInterval 1 -ErrorAction Stop
             $taskprincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType Interactive -RunLevel Highest -ErrorAction Stop
             $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
             $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every sunday at 22:00.' -ErrorAction Stop
 
-            Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Customer) - Remove PKI Backup files" -Force -ErrorAction Stop
+            Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - Remove PKI Backup files" -Force -ErrorAction Stop
         }
         catch
         {
-            Write-Warning -Message "Unable to create a ScheduledTask containing '$($Customer) - Remove PKI Backup files' - $($_.Exception.Message)"
+            Write-Warning -Message "Unable to create a ScheduledTask containing '$($Company) - Remove PKI Backup files' - $($_.Exception.Message)"
             Write-Output -InputObject 'Contact your PKI Administrator!'
             return
         }

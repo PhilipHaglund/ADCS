@@ -9,11 +9,11 @@
         Default the task will be run every 91 days. 
         
         .EXAMPLE
-        Add-ScheduledPKIMaintenance -CRTFile 'C:\Windows\system32\certsrv\CertEnroll\Contoso-Subordinate-CA.crt' -MaintenanceScriptFile 'C:\PKI\PKI-MaintenanceJob.ps1' -Customer Contoso -SMTPServer smtp.contoso.net -ToAddress recipient@contoso.com -FromAddress noreply@contoso.com
+        Add-ScheduledPKIMaintenance -CRTFile 'C:\Windows\system32\certsrv\CertEnroll\Contoso-Subordinate-CA.crt' -MaintenanceScriptFile 'C:\PKI\PKI-MaintenanceJob.ps1' -Company Contoso -SMTPServer smtp.contoso.net -ToAddress recipient@contoso.com -FromAddress noreply@contoso.com
         
         Creates and register a Scheduled Task containing a Powershell script action that will send a mail containing a recommended to do list for a three month PKI maintenance job.
         The parameters ToAddress, FromAddress and SMTP server will be outputed in the Action script (Example: C:\PKI\PKI-MaintenanceJob.ps1).
-        The parameter Customer is used to populate the HTML body text and Subject string in POwershell action script.
+        The parameter Company is used to populate the HTML body text and Subject string in POwershell action script.
 
         .INPUTS
         String
@@ -25,17 +25,18 @@
         Created by:     Philip Haglund
         Organization:   Gonjer.com
         Filename:       Add-ScheduledPKIMaintenance.ps1
-        Version:        0.1
+        Version:        0.2
         Requirements:   Powershell 3.0
         Changelog:      2017-01-04 09:22 - Creation of script.
                         2017-01-11 07:39 - Change HTML body. Rewrite help. Fix typos.
+                        2017-01-20 15:01 - More bug fixes and typo corrections.
 
         .LINK
         https://www.gonjer.com
     #>
     [cmdletbinding()]
     param (
-        # Specify a fully qualified file path for the .CRT File.
+        # Specify a fully qualified file path for the .CRT file.
         [Parameter(
                 Mandatory = $True,
                 ValueFromPipelineByPropertyName = $True,
@@ -66,14 +67,14 @@
         [ValidatePattern('^.*\.ps1$')]
         [IO.FileInfo]$MaintenanceScriptFile,
 
-        # A Customer Name used to populate the email template with correct information.
+        # A Company name used to populate the email template with correct information.
         [Parameter(
                 Mandatory = $True,
                 ValueFromPipelineByPropertyName = $True,
                 HelpMessage = 'Contoso'
         )]
         [ValidateNotNullOrEmpty()]
-        [string]$Customer,
+        [string]$Company,
 
         # A valid SMTP Server used to send information messages about PKI maintenance.
         [Parameter(
@@ -110,7 +111,7 @@
         $body = @"
 "<h1><span style='font-size:14px;'><span style='font-family: verdana,geneva,sans-serif;'>It&#39;s time for PKI maintenance!</span></span></h1>
 
-<p><span style='font-size:11px;'><span style='font-family: verdana,geneva,sans-serif;'>It was three months ago since the last PKI maintenance for $($Customer).</span></span></p>
+<p><span style='font-size:11px;'><span style='font-family: verdana,geneva,sans-serif;'>It was three months ago since the last PKI maintenance for $($Company).</span></span></p>
 
 <p><span style='font-size:11px;'><span style='font-family: verdana,geneva,sans-serif;'>Follow the to-do list below to keep the PKI structure/environment healthy and up to date.<br />
 <em>The to-do list is just a recomendation, not a forced task list.</em></span></span><br />
@@ -156,16 +157,16 @@
 <p><span style='font-size:11px;'><span style='font-family: verdana,geneva,sans-serif;'>Regards<br />
 Your PKI Administrator</span></span></p>"
 "@
-
-
-        $maintenancescript = @"
+    
+    
+            $maintenancescript = @"
 Send-MailMessage ``
 -To '$($ToAddress)' ``
 -BodyAsHtml ``
 -Encoding ([System.Text.Encoding]::UTF8) ``
 -From '$($FromAddress)' ``
 -SmtpServer '$($SMTPServer)' ``
--Subject 'PKI maintenance - $($Customer)' ``
+-Subject 'PKI maintenance - $($Company)' ``
 -Body $($body)
 "@
         try
@@ -207,11 +208,11 @@ Send-MailMessage ``
             $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
             $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every 3 months.' -ErrorAction Stop
 
-            Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Customer) - PKI 3 Month Maintenance" -Force -ErrorAction Stop
+            Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - PKI 3 Month Maintenance" -Force -ErrorAction Stop
         }
         catch
         {
-            Write-Warning -Message "Unable to create a ScheduledTask containing '$($Customer) - PKI 3 Month Maintenance' - $($_.Exception.Message)"
+            Write-Warning -Message "Unable to create a ScheduledTask containing '$($Company) - PKI 3 Month Maintenance' - $($_.Exception.Message)"
             Write-Output -InputObject 'Contact your PKI Administrator!'
             break
         }

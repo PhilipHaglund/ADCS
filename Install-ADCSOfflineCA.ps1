@@ -9,14 +9,14 @@
         Never use a network connection an a Root (Offline) Certificate Authority
 
         .EXAMPLE
-        Install-ADCSOfflineCA.ps1 -Customer DEMO -DomainURL pki.demo.com -ConfigNC 'CN=Configuration,DC=demo,DC=lab'
+        Install-ADCSOfflineCA.ps1 -Company DEMO -DomainURL pki.demo.com -ConfigNC 'CN=Configuration,DC=demo,DC=lab'
 
         This will install the install and configure the Certificate Authority Service with the CA name "DEMO-Root-CA".
         It will create the PKI folder in the default location ("$env:SystemDrive\PKI").
         The PKI folder contains the Database and paths for AIA and CRL.
 
         .EXAMPLE
-        Install-ADCSOfflineCA.ps1 -Customer Contoso -DomainURL pki.contoso.com -ConfigNC 'CN=Configuration,DC=contoso,DC=com' -LocalPKIPath E:\CALocation
+        Install-ADCSOfflineCA.ps1 -Company Contoso -DomainURL pki.contoso.com -ConfigNC 'CN=Configuration,DC=contoso,DC=com' -LocalPKIPath E:\CALocation
 
         This will install the install and configure the Certificate Authority Service with the CA name "Contoso-Root-CA".
         It will create a folder named PKI in CALocation on the disk E:\.
@@ -42,13 +42,13 @@
 [cmdletbinding()]
 param (
 
-    # Customer name that will belong in the Certificate Authority Name.
+    # Company name that will belong in the Certificate Authority Name.
     # Example: 'Contoso' will be "Contoso-ROOT-CA"
     [Parameter(
             Mandatory = $true,
-            HelpMessage = "Customer name that will belong in the Certificate Authority Name.`nExample: 'Contoso'`n'Contoso' will be 'Contoso-ROOT-CA'"
+            HelpMessage = "Company name that will belong in the Certificate Authority Name.`nExample: 'Contoso'`n'Contoso' will be 'Contoso-ROOT-CA'"
     )]
-    [string]$Customer,
+    [string]$Company,
 
     # URL for CRL and AIA publishing from the Subordinate CA.
     # Example: 'pki.contoso.com'
@@ -74,8 +74,6 @@ param (
 )
 begin
 {
-
-    #region Create a prompt function to allow for manual steps in the script.
     function Confirm-ToContinue
     {
         $caption = 'Manual Step'  
@@ -84,7 +82,7 @@ begin
         $yes = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Yes', 'Done with manual step.'
         $no = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&No', 'Not done, continue to prompt.'
         $cancel = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Cancel', 'Not done, exit script.'
-        $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no, $cancel)
+        $options = [Management.Automation.Host.ChoiceDescription[]]($yes, $no, $cancel)
         
         $do = $true
         do
@@ -111,19 +109,18 @@ begin
         }
         while ($do)
     }
-    #endregion Create a prompt function to allow for manual steps in the script.
 
     # Clear all errors    
     $Error.Clear()
 }
 process
 {
-    if ($PSCmdlet.ShouldProcess("$($Customer)($($DomainURL)) - $($LocalPKIPath)",'Configure Offline CA'))
+    if ($PSCmdlet.ShouldProcess("$($Company)($($DomainURL)) - $($LocalPKIPath)",'Configure Offline CA'))
     {
         #region Create directories
         $certdb  = New-Item -Path "$($LocalPKIPath)\Database\CertDB" -ItemType Directory -Force
         $certlog = New-Item -Path "$($LocalPKIPath)\Database\CertLog" -ItemType Directory -Force
-        $webpath = New-Item -Path "$($LocalPKIPath)\Web" -ItemType Directory -Force
+        $null = New-Item -Path "$($LocalPKIPath)\Web" -ItemType Directory -Force
         $crlpath = New-Item -Path "$($LocalPKIPath)\Web\CRL" -ItemType Directory -Force
         $aiapath = New-Item -Path "$($LocalPKIPath)\Web\AIA" -ItemType Directory -Force
         #endregion Create directories
@@ -173,9 +170,9 @@ Empty=True'
         #region Install-AdcsCertificationAuthority
         try
         { 
-            $install = Install-AdcsCertificationAuthority -CAType StandaloneRootCA `
-            -CACommonName "$Customer-ROOT-CA" `
-            -CADistinguishedNameSuffix "OU=PKI,O=$Customer,C=SE" `
+            $null = Install-AdcsCertificationAuthority -CAType StandaloneRootCA `
+            -CACommonName "$Company-ROOT-CA" `
+            -CADistinguishedNameSuffix "OU=PKI,O=$Company,C=SE" `
             -KeyLength 4096 `
             -HashAlgorithmName SHA256 `
             -CryptoProviderName 'RSA#Microsoft Software Key Storage Provider' `
@@ -194,8 +191,8 @@ Empty=True'
             Write-Output -InputObject 'Manual install AdcsCertificationAuthority with the following properties:'
             Write-Output -InputObject "
                 -CAType StandaloneRootCA
-                -CACommonName '$Customer-ROOT-CA'
-                -CADistinguishedNameSuffix 'OU=PKI,O=$Customer,C=SE'
+                -CACommonName '$Company-ROOT-CA'
+                -CADistinguishedNameSuffix 'OU=PKI,O=$Company,C=SE'
                 -KeyLength 4096
                 -HashAlgorithmName SHA256
                 -CryptoProviderName 'RSA#Microsoft Software Key Storage Provider'
