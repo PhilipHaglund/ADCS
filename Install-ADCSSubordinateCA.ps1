@@ -9,22 +9,25 @@
         Tested on Windows Server 2012R2 and Server 2016.
 
         .EXAMPLE
-        Install-ADCSSubordinateCA.ps1 -Company Demo -DomainURL pki.demo.com
+        Install-ADCSSubordinateCA.ps1 -Company Demo -DomainURL pki.demo.com -SMTPServer smtp.demo.com -ToAddress 'recipient@demo.com' -FromAddress 'sender@demo.com' -City 'Gothenburg' -State 'VG'
 
         This will install the install and configure the Certificate Authority Service with the CA name "Demo-Subordinate-CA".
         It will create the PKI folder in the default location ("$env:SystemDrive\PKI").
-        The PKI folder contains the Database and paths for AIA and CRL.
+        The PKI folder contains the Database and paths for AIA and CRL files.
         A Web Virtual Directory will be created with the name PKI mapped to "$env:SystemDrive\PKI\Web"
-        Three scheduled tasks will be created 
+        Three scheduled tasks will be created containg backup scripts and a PKI health information script.
+        The ADCS Web Enrollment page will contain information used in the City and State parameters.
 
 
         .EXAMPLE
-        Install-ADCSSubordinateCA.ps1 -Company Contoso -DomainURL pki.contoso.com -LocalPKIPath E:\CALocation
+        Install-ADCSSubordinateCA.ps1 -Company Contoso -DomainURL pki.contoso.com -LocalPKIPath E:\CALocation -SMTPServer smtp.contoso.com -ToAddress 'recipient@contoso.com' -FromAddress 'sender@contoso.com' -City 'Copenhagen' -State 'Hovedstaden'
 
         This will install the install and configure the Certificate Authority Service with the CA name "Contoso-Subordinate-CA".
         It will create a folder named CALocation in E:\.
-        The PKI folder contains the Database and paths for AIA and CRL.
+        The PKI (CALocation) folder contains the Database and paths for AIA and CRL files.
         A Web Virtual Directory will be created with the name PKI mapped to "E:\CALocation\Web"
+        Three scheduled tasks will be created containg backup scripts and a PKI health information script.
+        The ADCS Web Enrollment page will contain information used in the City and State parameters.
         
         
         .INPUTS
@@ -103,7 +106,27 @@ param (
             HelpMessage = 'Enter a valid mailaddress. Example: noreply@contoso.com'
     )]
     [ValidateNotNullOrEmpty()]
-    [mailaddress]$FromAddress
+    [mailaddress]$FromAddress,
+
+    # A city used to populate the certdat.inc file with correct information.
+    # Example: Gothenburg
+    [Parameter(
+            Mandatory = $True,
+            ValueFromPipelineByPropertyName = $True,
+            HelpMessage = 'Gothenburg'
+    )]
+    [ValidateNotNullOrEmpty()]
+    [string]$City,
+
+    # A state used to populate the certdat.inc file with correct information.
+    # Example: VG
+    [Parameter(
+            Mandatory = $True,
+            ValueFromPipelineByPropertyName = $True,
+            HelpMessage = 'VG'
+    )]
+    [ValidateNotNullOrEmpty()]
+    [string]$State
 
 )
 
@@ -366,169 +389,184 @@ Send-MailMessage ``
     }
     function Edit-Certdat
     {
-    <#
-        .SYNOPSIS
-        Edits the Certdat.inc file located in under WinDir\System32\certsrv (C:\Windows\System32\CertSrv).
-        
-        .DESCRIPTION
-        Edits the Certdat.inc file based on the input to match the company properties.
-        Will modify the following set of variables:
-
-        sDefaultCompany=""
-	    sDefaultOrgUnit=""
-	    sDefaultLocality=""
-	    sDefaultState=""
-	    sDefaultCountry=""	   
-	    sServerDisplayName=""
-                
-        .EXAMPLE
-        Edit-Certdat -Company 'Contoso' -City 'Gothenburg' -State VG
-        
-        This will modify the file 'C:\Windows\system32\certsrv\certdat.inc' and change the following variables:
-
-        sDefaultCompany="Contoso"
-	    sDefaultOrgUnit="IT"
-	    sDefaultLocality="Gothenburg"
-	    sDefaultState="VG"
-	    sDefaultCountry="Sweden"	   
-	    sServerDisplayName="Contoso - Certificate Authority"
-        
-        .EXAMPLE
-        Edit-Certdat -CertdatFile 'E:\Windows\system32\certsrv\certdat.inc' -Company 'Contoso DK' -OrgUnit 'Information Technology' -City 'Copenhagen' -State 'Hovedstaden' -Country 'Denmark'
-        
-        This will modify the file 'E:\Windows\system32\certsrv\certdat.inc' and change the following variables:
-
-        sDefaultCompany="Contoso DK"
-	    sDefaultOrgUnit="Information Technology"
-	    sDefaultLocality="Copenhagen"
-	    sDefaultState="Hovedstaden"
-	    sDefaultCountry="Denmark"	   
-	    sServerDisplayName="Contoso DK - Certificate Authority"
-        
-        .INPUTS
-        IO.FileInfo
-        String        
-        
-        .NOTES
-        Created on:     2017-01-20 13:48
-        Created by:     Philip Haglund
-        Organization:   Gonjer.com
-        Filename:       Edit-Certdat.ps1
-        Version:        0.1
-        Requirements:   Powershell 3.0
-        Changelog:      2017-01-20 13:48 - Creation of script.
-                        
-        
-        .LINK
-        https://www.gonjer.com
-    #>
-
-    [cmdletbinding()]
-    param (
-        # Specify a fully qualified file path for the certdat.inc file.
-        # Example: C:\Windows\system32\certsrv\certdat.inc
-        [Parameter(
+        <#
+            .SYNOPSIS
+            Edits the Certdat.inc file located in under WinDir\System32\certsrv (C:\Windows\System32\CertSrv).
+            
+            .DESCRIPTION
+            Edits the Certdat.inc file based on the input to match the company properties.
+            Will modify the following set of variables:
+    
+            sDefaultCompany=""
+    	    sDefaultOrgUnit=""
+    	    sDefaultLocality=""
+    	    sDefaultState=""
+    	    sDefaultCountry=""	   
+    	    sServerDisplayName=""
+                    
+            .EXAMPLE
+            Edit-Certdat -Company 'Contoso' -City 'Gothenburg' -State VG
+            
+            This will modify the file 'C:\Windows\system32\certsrv\certdat.inc' and change the variables.
+            Output till be:
+    
+                sDefaultCompany="Contoso"
+    	        sDefaultOrgUnit="IT"
+    	        sDefaultLocality="Gothenburg"
+    	        sDefaultState="VG"
+    	        sDefaultCountry="Sweden"	   
+    	        sServerDisplayName="Contoso - Certificate Authority"
+            
+            .EXAMPLE
+            Edit-Certdat -CertdatFile 'E:\Windows\system32\certsrv\certdat.inc' -Company 'Contoso DK' -OrgUnit 'Information Technology' -City 'Copenhagen' -State 'Hovedstaden' -Country 'Denmark'
+            
+            This will modify the file 'E:\Windows\system32\certsrv\certdat.inc' and and change the variables.
+            Output till be:
+    
+                sDefaultCompany="Contoso DK"
+    	        sDefaultOrgUnit="Information Technology"
+    	        sDefaultLocality="Copenhagen"
+    	        sDefaultState="Hovedstaden"
+    	        sDefaultCountry="Denmark"	   
+    	        sServerDisplayName="Contoso DK - Certificate Authority"
+            
+            .INPUTS
+            IO.FileInfo
+            String
+            
+            .NOTES
+            Created on:     2017-01-20 13:48
+            Created by:     Philip Haglund
+            Organization:   Gonjer.com
+            Filename:       Edit-Certdat.ps1
+            Version:        0.2
+            Requirements:   Powershell 3.0
+            Changelog:      2017-01-20 13:48 - Creation of script.
+                            2017-01-20 16:43 - Added output to function and allow empty strings to parameters.
+                            
+            
+            .LINK
+            https://www.gonjer.com
+        #>
+    
+        [cmdletbinding()]
+        param (
+            # Specify a fully qualified file path for the certdat.inc file.
+            # Example: C:\Windows\system32\certsrv\certdat.inc
+            [Parameter(
+                        ValueFromPipelineByPropertyName = $True
+            )]
+            [ValidateNotNullOrEmpty()]
+            [ValidatePattern('^.*\.inc$')]
+            [ValidateScript({
+                        if (Test-Path -Path $_)
+                        {
+                            $True
+                        }
+                        else
+                        {
+                            throw "The path '$_' is not available."
+                        }
+            })]
+            [Alias('dat')]
+            [IO.FileInfo]$CertdatFile = "$env:windir\system32\certsrv\certdat.inc",
+    
+            # A Company name used to populate the certdat.inc file with correct information.
+            [Parameter(
+                    Mandatory = $True,
+                    ValueFromPipelineByPropertyName = $True,
+                    HelpMessage = 'Contoso'
+            )]
+            [AllowEmptyString()]
+            [string]$Company,
+    
+            # An organizational unit used to populate the certdat.inc file with correct information.
+            # Example: IT
+            [Parameter(
                     ValueFromPipelineByPropertyName = $True
-        )]
-        [ValidateNotNullOrEmpty()]
-        [ValidatePattern('^.*\.inc$')]
-        [ValidateScript({
-                    if (Test-Path -Path $_)
-                    {
-                        $True
-                    }
-                    else
-                    {
-                        throw "The path '$_' is not available."
-                    }
-        })]
-        [Alias('dat')]
-        [IO.FileInfo]$CertdatFile = "$env:windir\system32\certsrv\certdat.inc",
-
-        # A Company name used to populate the certdat.inc file with correct information.
-        [Parameter(
-                Mandatory = $True,
-                ValueFromPipelineByPropertyName = $True,
-                HelpMessage = 'Contoso'
-        )]
-        [ValidateNotNullOrEmpty()]
-        [string]$Company,
-
-        # An organizational unit used to populate the certdat.inc file with correct information.
-        # Example: IT
-        [Parameter(
-                ValueFromPipelineByPropertyName = $True
-        )]
-        [ValidateNotNullOrEmpty()]
-        [string]$OrgUnit = 'IT',
-
-        # A city used to populate the certdat.inc file with correct information.
-        # Example: Gothenburg
-        [Parameter(
-                Mandatory = $True,
-                ValueFromPipelineByPropertyName = $True,
-                HelpMessage = 'Gothenburg'
-        )]
-        [ValidateNotNullOrEmpty()]
-        [string]$City,
-
-        # A state used to populate the certdat.inc file with correct information.
-        # Example: VG
-        [Parameter(
-                Mandatory = $True,
-                ValueFromPipelineByPropertyName = $True,
-                HelpMessage = 'VG'
-        )]
-        [ValidateNotNullOrEmpty()]
-        [string]$State,
-
-        # A state used to populate the certdat.inc file with correct information.
-        # Example: VG
-        [Parameter(
-                ValueFromPipelineByPropertyName = $True                
-        )]
-        [ValidateNotNullOrEmpty()]
-        [string]$Country = 'Sweden'
-    )
-    begin
-    {
-        $warningtext = 'Will not create modify the Web Enrollment page.'
-
-        try
+            )]
+            [AllowEmptyString()]
+            [string]$OrgUnit = 'IT',
+    
+            # A city used to populate the certdat.inc file with correct information.
+            # Example: Gothenburg
+            [Parameter(
+                    Mandatory = $True,
+                    ValueFromPipelineByPropertyName = $True,
+                    HelpMessage = 'Gothenburg'
+            )]
+            [AllowEmptyString()]
+            [string]$City,
+    
+            # A state used to populate the certdat.inc file with correct information.
+            # Example: VG
+            [Parameter(
+                    Mandatory = $True,
+                    ValueFromPipelineByPropertyName = $True,
+                    HelpMessage = 'VG'
+            )]
+            [AllowEmptyString()]
+            [string]$State,
+    
+            # A state used to populate the certdat.inc file with correct information.
+            # Example: VG
+            [Parameter(
+                    ValueFromPipelineByPropertyName = $True                
+            )]
+            [AllowEmptyString()]
+            [string]$Country = 'Sweden'
+        )
+        begin
         {
-            $content = Get-Content -Path $CertdatFile -ErrorAction Stop
+            $warningtext = 'Will not create modify the Web Enrollment page.'
+    
+            try
+            {
+                $content = Get-Content -Path $CertdatFile -ErrorAction Stop
+            }
+            catch
+            {
+                Write-Error -Message "Unable to open the file $($CertdatFile) - $($_.Exception.Message)"
+                Write-Warning -Message $warningtext
+                break
+            }       
         }
-        catch
+        process
         {
-            Write-Error -Message "Unable to open the file $($CertdatFile) - $($_.Exception.Message)"
-            Write-Warning -Message $warningtext
-            break
-        }       
-    }
-    process
-    {
-        # A set or variables containing the regex relace strings
-        $sdefaultcompany    = 'sDefaultCompany\=\"(.+|)\"', "sDefaultCompany=`"$Company`""
-        $sdefaultorgUnit    = 'sDefaultOrgUnit\=\"(.+|)\"', "sDefaultOrgUnit=`"$OrgUnit`""
-        $sdefaultlocality   = 'sDefaultLocality\=\"(.+|)\"', "sDefaultLocality=`"$City`""
-        $sdefaultstate      = 'sDefaultState\=\"(.+|)\"', "sDefaultState=`"$State`""
-        $sdefaultcountry    = 'sDefaultCountry\=\"(.+|)\"', "sDefaultCountry=`"$Country`""
-        $sserverdisplayname = 'sServerDisplayName\=\"(.+|)\"', "sServerDisplayName=`"$Company - Certificate Authority`""
-
-        $modcontent = $content -replace $sdefaultcompany -replace $sdefaultorgUnit -replace $sdefaultlocality -replace $sdefaultstate -replace $sdefaultcountry -replace $sserverdisplayname
-
-        try
-        {
-            $modcontent | Set-Content -Path $CertdatFile -Force -Encoding UTF8
-        }
-        catch
-        {
-            Write-Error -Message "Unable to modiofy the file $($CertdatFile) - $($_.Exception.Message)"
-            Write-Warning -Message $warningtext
-            break
+            # A set or variables containing the regex relace strings
+            $sdefaultcompany    = 'sDefaultCompany\=\"(.+|)\"', "sDefaultCompany=`"$Company`""
+            $sdefaultorgUnit    = 'sDefaultOrgUnit\=\"(.+|)\"', "sDefaultOrgUnit=`"$OrgUnit`""
+            $sdefaultlocality   = 'sDefaultLocality\=\"(.+|)\"', "sDefaultLocality=`"$City`""
+            $sdefaultstate      = 'sDefaultState\=\"(.+|)\"', "sDefaultState=`"$State`""
+            $sdefaultcountry    = 'sDefaultCountry\=\"(.+|)\"', "sDefaultCountry=`"$Country`""
+            $sserverdisplayname = 'sServerDisplayName\=\"(.+|)\"', "sServerDisplayName=`"$Company - Certificate Authority`""
+    
+            $modcontent = $content -replace $sdefaultcompany -replace $sdefaultorgUnit -replace $sdefaultlocality -replace $sdefaultstate -replace $sdefaultcountry -replace $sserverdisplayname
+    
+            try
+            {
+                $modcontent | Set-Content -Path $CertdatFile -Force -Encoding UTF8
+            }
+            catch
+            {
+                Write-Error -Message "Unable to modiofy the file $($CertdatFile) - $($_.Exception.Message)"
+                Write-Warning -Message $warningtext
+                break
+            }
+    
+            # Write the changed content
+            try
+            {
+                $content = Get-Content -Path $CertdatFile -ErrorAction Stop
+                $content -match '{0}|{1}|{2}|{3}|{4}|{5}' -f $sdefaultcompany[0],$sdefaultorgUnit[0],$sdefaultlocality[0],$sdefaultstate[0],$sdefaultcountry[0],$sserverdisplayname[0]
+            }
+            catch
+            {
+                Write-Warning -Message $warningtext
+                break
+            }        
         }
     }
-}
     function Register-CABackup
     {
         <#
@@ -1412,6 +1450,13 @@ $webconfig = @'
         Write-Output -InputObject 'Press cancel and redo the Install Subordinate Certificate process after a minute or two or make sure that the Root Certificate is replicated by verifying using "repadmin /replsum".'
         Start-Process -FilePath certsrv.msc
         Confirm-ToContinue
+
+        Write-Output -InputObject "`nStep 9: Automatically modifying variables in certdat.inc (Active Directory Web Enrollment)."
+        Write-Output -InputObject "Is the variables below correct for the Active Directory Web Enrollment page?`n"
+        Edit-Certdat -Company $Company -City $City -State $State
+        Write-Output -InputObject "`nIf it does not match or is not correct, manually modify the file '$env:windir\system32\certsrv\certdat.inc'."
+        Confirm-ToContinue
+
 
         Write-Output -InputObject "`nRecommended Step: Configure a top level Group Policy for Certificate Auto Enrollment."
         Write-Output -InputObject "Open gpedit.msc and create a new Group Policy in the domain root. Example: $($Company)-AutoEnrollment"

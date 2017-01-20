@@ -18,26 +18,28 @@
         .EXAMPLE
         Edit-Certdat -Company 'Contoso' -City 'Gothenburg' -State VG
         
-        This will modify the file 'C:\Windows\system32\certsrv\certdat.inc' and change the following variables:
+        This will modify the file 'C:\Windows\system32\certsrv\certdat.inc' and change the variables.
+        Output till be:
 
-        sDefaultCompany="Contoso"
-	    sDefaultOrgUnit="IT"
-	    sDefaultLocality="Gothenburg"
-	    sDefaultState="VG"
-	    sDefaultCountry="Sweden"	   
-	    sServerDisplayName="Contoso - Certificate Authority"
+            sDefaultCompany="Contoso"
+	        sDefaultOrgUnit="IT"
+	        sDefaultLocality="Gothenburg"
+	        sDefaultState="VG"
+	        sDefaultCountry="Sweden"	   
+	        sServerDisplayName="Contoso - Certificate Authority"
         
         .EXAMPLE
         Edit-Certdat -CertdatFile 'E:\Windows\system32\certsrv\certdat.inc' -Company 'Contoso DK' -OrgUnit 'Information Technology' -City 'Copenhagen' -State 'Hovedstaden' -Country 'Denmark'
         
-        This will modify the file 'E:\Windows\system32\certsrv\certdat.inc' and change the following variables:
+        This will modify the file 'E:\Windows\system32\certsrv\certdat.inc' and and change the variables.
+        Output till be:
 
-        sDefaultCompany="Contoso DK"
-	    sDefaultOrgUnit="Information Technology"
-	    sDefaultLocality="Copenhagen"
-	    sDefaultState="Hovedstaden"
-	    sDefaultCountry="Denmark"	   
-	    sServerDisplayName="Contoso DK - Certificate Authority"
+            sDefaultCompany="Contoso DK"
+	        sDefaultOrgUnit="Information Technology"
+	        sDefaultLocality="Copenhagen"
+	        sDefaultState="Hovedstaden"
+	        sDefaultCountry="Denmark"	   
+	        sServerDisplayName="Contoso DK - Certificate Authority"
         
         .INPUTS
         IO.FileInfo
@@ -48,9 +50,10 @@
         Created by:     Philip Haglund
         Organization:   Gonjer.com
         Filename:       Edit-Certdat.ps1
-        Version:        0.1
+        Version:        0.2
         Requirements:   Powershell 3.0
         Changelog:      2017-01-20 13:48 - Creation of script.
+                        2017-01-20 16:43 - Added output to function and allow empty strings to parameters.
                         
         
         .LINK
@@ -85,7 +88,7 @@
                 ValueFromPipelineByPropertyName = $True,
                 HelpMessage = 'Contoso'
         )]
-        [ValidateNotNullOrEmpty()]
+        [AllowEmptyString()]
         [string]$Company,
 
         # An organizational unit used to populate the certdat.inc file with correct information.
@@ -93,7 +96,7 @@
         [Parameter(
                 ValueFromPipelineByPropertyName = $True
         )]
-        [ValidateNotNullOrEmpty()]
+        [AllowEmptyString()]
         [string]$OrgUnit = 'IT',
 
         # A city used to populate the certdat.inc file with correct information.
@@ -103,7 +106,7 @@
                 ValueFromPipelineByPropertyName = $True,
                 HelpMessage = 'Gothenburg'
         )]
-        [ValidateNotNullOrEmpty()]
+        [AllowEmptyString()]
         [string]$City,
 
         # A state used to populate the certdat.inc file with correct information.
@@ -113,7 +116,7 @@
                 ValueFromPipelineByPropertyName = $True,
                 HelpMessage = 'VG'
         )]
-        [ValidateNotNullOrEmpty()]
+        [AllowEmptyString()]
         [string]$State,
 
         # A state used to populate the certdat.inc file with correct information.
@@ -121,7 +124,7 @@
         [Parameter(
                 ValueFromPipelineByPropertyName = $True                
         )]
-        [ValidateNotNullOrEmpty()]
+        [AllowEmptyString()]
         [string]$Country = 'Sweden'
     )
     begin
@@ -161,5 +164,17 @@
             Write-Warning -Message $warningtext
             break
         }
+
+        # Write the changed content
+        try
+        {
+            $content = Get-Content -Path $CertdatFile -ErrorAction Stop
+            $content -match '{0}|{1}|{2}|{3}|{4}|{5}' -f $sdefaultcompany[0],$sdefaultorgUnit[0],$sdefaultlocality[0],$sdefaultstate[0],$sdefaultcountry[0],$sserverdisplayname[0]
+        }
+        catch
+        {
+            Write-Warning -Message $warningtext
+            break
+        }        
     }
 }
