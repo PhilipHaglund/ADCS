@@ -38,7 +38,7 @@
         .NOTES
         Created on:     2016-05-11 09:15
         Created by:     Philip Haglund
-        Organization:   Gonjer.com for Zetup AB
+        Organization:   Gonjer.com
         Filename:       Install-ADCSSubordinateCA.ps1
         Version:        0.5
         Requirements:   Powershell 4.0 (Module: NetTCPIP, ServerManager)
@@ -50,7 +50,6 @@
                         2017-01-11 14:57 - Added functions 'Register-CABackup' and 'Add-ScheduledPKIMaintenance'. Change ValidityPeriod to 30 months instead of 2 years.
         .LINK
         https://www.gonjer.com
-        http://www.zetup.se
 #>
 #requires -Version 4.0
 [cmdletbinding(
@@ -340,7 +339,7 @@ Send-MailMessage ``
                 $tasktrigger   = New-ScheduledTaskTrigger -DaysInterval 91 -At $crtdate -Daily -ErrorAction Stop
                 $taskprincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType Interactive -RunLevel Highest -ErrorAction Stop
                 $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
-                $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every 3 months.' -ErrorAction Stop
+                $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description "Automatically created by $($MyInvocation.MyCommand.Name) - Runs every 3 months." -ErrorAction Stop
     
                 Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - PKI 3 Month Maintenance" -Force -ErrorAction Stop
             }
@@ -1106,7 +1105,7 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
                 $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At (Get-Date -Date 18:00) -WeeksInterval 1 -ErrorAction Stop
                 $taskprincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType Interactive -RunLevel Highest -ErrorAction Stop
                 $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
-                $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every friday at 18:00.' -ErrorAction Stop
+                $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description "Automatically created by $($MyInvocation.MyCommand.Name) - Runs every friday at 18:00." -ErrorAction Stop
     
                 Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - Backup PKI" -Force -ErrorAction Stop
             }
@@ -1138,7 +1137,7 @@ public static extern int CertSrvRestoreGetDatabaseLocations(
                 $tasktrigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At (Get-Date -Date 22:00) -WeeksInterval 1 -ErrorAction Stop
                 $taskprincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType Interactive -RunLevel Highest -ErrorAction Stop
                 $tasksettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) -Hidden -StartWhenAvailable -WakeToRun -DisallowHardTerminate -DontStopOnIdleEnd -ErrorAction Stop
-                $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description 'Automatically created by Zetup - Runs every sunday at 22:00.' -ErrorAction Stop
+                $scheduledtask = New-ScheduledTask -Action $taskaction -Trigger $tasktrigger -Principal $taskprincipal -Settings $tasksettings -Description "Automatically created by $($MyInvocation.MyCommand.Name) - Runs every sunday at 22:00." -ErrorAction Stop
     
                 Register-ScheduledTask -InputObject $scheduledtask -TaskName "$($Company) - Remove PKI Backup files" -Force -ErrorAction Stop
             }
@@ -1374,7 +1373,7 @@ $webconfig = @'
 
         Write-Output -InputObject "`nStep 1: Create DNS-Zone."
         Write-Output -InputObject "Create a DNS-Zone with the name $DomainURL or/and create a A-record pointing to this server IP ($ipaddress) on the internal DNS servers."
-        Write-Output -InputObject 'It is highly recommended to create an external DNS-record '
+        Write-Output -InputObject "It is highly recommended to create an external DNS-record and an external webpublishing for the $DomainURL."
         Confirm-ToContinue
 
         Write-Output -InputObject "`nStep 2: Submit and issue the Subordinate CA certificate on the Root CA."

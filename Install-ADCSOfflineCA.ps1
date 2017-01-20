@@ -26,7 +26,7 @@
         .NOTES
         Created on:     2016-05-11 09:15
         Created by:     Philip Haglund
-        Organization:   Gonjer.com for Zetup AB
+        Organization:   Gonjer.com
         Filename:       Install-ADCSOfflineCA.ps1
         Version:        0.4
         Requirements:   Powershell 4.0 (Module: ServerManager)
@@ -36,7 +36,6 @@
                         2017-01-10 15:34 - Correction of typos. Clean up help text.
         .LINK
         https://www.gonjer.com
-        http://www.zetup.se
 #>
 #requires -Version 4.0
 [cmdletbinding()]
