@@ -67,8 +67,7 @@ Installation
  4.5. Copy the CRL and CRT files from the Root/Offline CA server to the Enterprise/Subordinate server.  
  ![Copy CRL and CRT files](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/21_PKI.png)
  
- Example:
- 
+ Example: 
  ![Example Copy](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/22_PKI.png)
 
  4.6. Unzip / Move the copied CRL and CRT files (*Step 4.5*) to the correct paths on the Enterprise/Subordinate CA Server. 
@@ -84,7 +83,6 @@ Installation
  ![Install Subordinate Certificate](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/29_PKI.png)
 
  Example:
- 
  ![Install CA Certificate](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/30_PKI.png)
  
  4.9. Automatically modifying "certdat.inc" file to match the Company information.
