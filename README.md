@@ -109,4 +109,4 @@ Installation
 
 
 
-> For a more detailed installation check the soon to be updated [Wiki section.](https://github.com/PhilipHaglund/ADCS/wiki)
+> For a more detailed installation check the [Wiki section.](https://github.com/PhilipHaglund/ADCS/wiki/Detailed-Installation-instructions)
