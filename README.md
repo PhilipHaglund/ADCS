@@ -4,6 +4,44 @@ This my take on a simple yet powerful Active Directory Certificate Services (ADC
 The two PowerShell scripts provides an easy and documented process to install, configure and setup a complete two-tier PKI environment.
 
 ![PKI Overview](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/0_PKI.png)
+<br>
+
+**Root/Offline CA Configuration:**
+Item                  | Value (*Can be modified*)
+--------              | --------
+Customer              | *Contoso*
+Operating system      | 2012 / 2012R2 / 2016
+CA Type               | Standalone Root
+CA Name               | *Contoso*-ROOT-CA
+Validity Period       | 10 years
+CSP                   | RSA #Microsoft Software Key Storage Provider
+Hash Algorithm        | SHA256
+Key Length            | 4096
+Database Location     | *C:\PKI*\Database\CertDB
+Database Log Location | *C:\PKI*\Database\CertLog
+CRL Validity Period   | 1 year (No delta)
+CDP                   | Only HTTP - *pki.contoso.com*
+CAPolicy.inf          | Automatically generated
+
+
+<br>
+
+**Enterprise/Subordinate CA Configuration:**
+Item                  | Value (*Can be modified*)
+--------              | --------
+Customer              | *Contoso*
+Operating system      | 2012 / 2012R2 / 2016
+CA Type               | Enterprise Subordinate
+CA Name               | *Contoso*-Subordinate-CA
+Validity Period       | 5 years
+CSP                   | RSA #Microsoft Software Key Storage Provider
+Hash Algorithm        | SHA256
+Key Length            | 2048
+Database Location     | *C:\PKI*\Database\CertDB
+Database Log Location | *C:\PKI*\Database\CertLog
+CRL Validity Period   | 7 days (No delta)
+CDP                   | Only HTTP - *pki.contoso.com*
+CAPolicy.inf          | Automatically generated
 
 
 ----------
@@ -108,5 +146,5 @@ Installation
  ![pkivewi.msc](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/41_PKI.png)
 
 
-
+<br>
 > For a more detailed installation check the [Wiki section.](https://github.com/PhilipHaglund/ADCS/wiki/Detailed-Installation-instructions)
