@@ -70,7 +70,8 @@ Installation
  ![Copy CRL and CRT files](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/21_PKI.png)
 
 
- Example: 
+ Example:
+
  ![Example Copy](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/22_PKI.png)
 
 
@@ -106,6 +107,6 @@ Installation
  Verify the setup in pkiview.msc.
  ![pkivewi.msc](https://raw.githubusercontent.com/PhilipHaglund/ADCS/master/images/41_PKI.png)
 
-----------
+
 
 > For a more detailed installation check the soon to be updated [Wiki section.](https://github.com/PhilipHaglund/ADCS/wiki)
