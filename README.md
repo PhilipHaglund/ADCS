@@ -7,6 +7,7 @@ The two PowerShell scripts provides an easy and documented process to install, c
 <br>
 
 **Root/Offline CA Configuration:**
+
 Item                  | Value (*Can be modified*)
 --------              | --------
 Customer              | *Contoso*
@@ -27,6 +28,7 @@ CAPolicy.inf          | Automatically generated
 <br>
 
 **Enterprise/Subordinate CA Configuration:**
+
 Item                  | Value (*Can be modified*)
 --------              | --------
 Customer              | *Contoso*
